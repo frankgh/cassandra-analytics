@@ -29,5 +29,7 @@ public enum InstanceState
     MOVING,
     JOINING,
     STARTING,
+    // Custom state from sidecar when the instance is being replaced
+    REPLACING,
     UNKNOWN
 }

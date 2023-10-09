@@ -25,6 +25,7 @@ import java.util.Map;
 
 import org.apache.cassandra.sidecar.common.data.TimeSkewResponse;
 import org.apache.cassandra.spark.bulkwriter.token.CassandraRing;
+import org.apache.cassandra.spark.bulkwriter.token.TokenRangeMapping;
 import org.apache.cassandra.spark.common.client.InstanceState;
 import org.apache.cassandra.spark.data.partitioner.Partitioner;
 import org.apache.cassandra.spark.validation.StartupValidatable;
@@ -33,7 +34,9 @@ public interface ClusterInfo extends StartupValidatable, Serializable
 {
     void refreshClusterInfo();
 
-    CassandraRing<RingInstance> getRing(boolean cached);
+    CassandraRing getRing(boolean cached);
+
+    TokenRangeMapping<RingInstance> getTokenRangeMapping(boolean cached);
 
     String getLowestCassandraVersion();
 

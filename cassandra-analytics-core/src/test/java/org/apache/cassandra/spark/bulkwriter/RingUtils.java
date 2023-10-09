@@ -19,17 +19,28 @@
 
 package org.apache.cassandra.spark.bulkwriter;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import javax.validation.constraints.NotNull;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Range;
 
 import org.apache.cassandra.sidecar.common.data.RingEntry;
+import org.apache.cassandra.sidecar.common.data.TokenRangeReplicasResponse.ReplicaMetadata;
 import org.apache.cassandra.spark.bulkwriter.token.CassandraRing;
+import org.apache.cassandra.spark.bulkwriter.token.RangeUtils;
+import org.apache.cassandra.spark.bulkwriter.token.TokenRangeMapping;
 import org.apache.cassandra.spark.data.ReplicationFactor;
 import org.apache.cassandra.spark.data.partitioner.Partitioner;
-import org.jetbrains.annotations.NotNull;
+
 
 public final class RingUtils
 {
@@ -38,33 +49,88 @@ public final class RingUtils
         throw new IllegalStateException(getClass() + " is static utility class and shall not be instantiated");
     }
 
-    @NotNull
-    static CassandraRing<RingInstance> buildRing(int initialToken,
-                                                 String dataCenter,
-                                                 String keyspace)
-    {
-        return buildRing(initialToken, dataCenter, keyspace, 3);
-    }
-
-    @NotNull
-    public static CassandraRing<RingInstance> buildRing(int initialToken,
-                                                        String dataCenter,
-                                                        String keyspace,
-                                                        int instancesPerDC)
+    public static CassandraRing buildRing(final String dataCenter, final String keyspace)
     {
         ImmutableMap<String, Integer> rfByDC = ImmutableMap.of(dataCenter, 3);
-        return buildRing(initialToken, rfByDC, keyspace, instancesPerDC);
+        return buildRing(rfByDC, keyspace);
     }
 
     @NotNull
-    static CassandraRing<RingInstance> buildRing(int initialToken,
-                                                 ImmutableMap<String, Integer> rfByDC,
-                                                 String keyspace,
-                                                 int instancesPerDC)
+    static CassandraRing buildRing(final ImmutableMap<String, Integer> rfByDC, final String keyspace)
     {
-        List<RingInstance> instances = getInstances(initialToken, rfByDC, instancesPerDC);
+
         ReplicationFactor replicationFactor = getReplicationFactor(rfByDC);
-        return new CassandraRing<>(Partitioner.Murmur3Partitioner, keyspace, replicationFactor, instances);
+        return new CassandraRing(Partitioner.Murmur3Partitioner, keyspace, replicationFactor);
+    }
+
+    public static TokenRangeMapping<RingInstance> buildTokenRangeMapping(final int initialToken, final ImmutableMap<String, Integer> rfByDC, int instancesPerDC)
+    {
+
+        final List<RingInstance> instances = getInstances(initialToken, rfByDC, instancesPerDC);
+
+        ReplicationFactor replicationFactor = getReplicationFactor(rfByDC);
+        Map<String, Set<String>> writeReplicas = instances.stream()
+                                                          .collect(Collectors.groupingBy(RingInstance::getDataCenter,
+                                                                                         Collectors.mapping(RingInstance::getNodeName,
+                                                                                                            Collectors.toSet())));
+        writeReplicas.replaceAll((key, value) -> {
+            value.removeIf(e -> value.size() > 3);
+            return value;
+        });
+
+        List<ReplicaMetadata> replicaMetadata = instances.stream().map(i -> new ReplicaMetadata(i.getRingInstance().state(),
+                                                                                       i.getRingInstance().status(),
+                                                                                       i.getNodeName(),
+                                                                                       i.getIpAddress(),
+                                                                                       i.getDataCenter()))
+                                                .collect(Collectors.toList());
+
+        Multimap<RingInstance, Range<BigInteger>> tokenRanges = setupTokenRangeMap(Partitioner.Murmur3Partitioner, replicationFactor, instances);
+        return new TokenRangeMapping<>(Partitioner.Murmur3Partitioner,
+                                       writeReplicas,
+                                       Collections.emptyMap(),
+                                       tokenRanges,
+                                       replicaMetadata,
+                                       Collections.emptySet(),
+                                       Collections.emptySet());
+    }
+
+    // Used only in tests
+    public static Multimap<RingInstance, Range<BigInteger>> setupTokenRangeMap(Partitioner partitioner,
+                                                                               ReplicationFactor replicationFactor,
+                                                                               List<RingInstance> instances)
+    {
+        ArrayListMultimap<RingInstance, Range<BigInteger>> tokenRangeMap = ArrayListMultimap.create();
+
+        if (replicationFactor.getReplicationStrategy() == ReplicationFactor.ReplicationStrategy.SimpleStrategy)
+        {
+            tokenRangeMap.putAll(RangeUtils.calculateTokenRanges(instances,
+                                                                 replicationFactor.getTotalReplicationFactor(),
+                                                                 partitioner));
+        }
+        else if (replicationFactor.getReplicationStrategy() == ReplicationFactor.ReplicationStrategy.NetworkTopologyStrategy)
+        {
+            for (final String dataCenter : replicationFactor.getOptions().keySet())
+            {
+                final int rf = replicationFactor.getOptions().get(dataCenter);
+                if (rf == 0)
+                {
+                    // Apparently, its valid to have zero replication factor in Cassandra
+                    continue;
+                }
+                List<RingInstance> dcInstances = instances.stream()
+                                                          .filter(instance -> instance.getDataCenter().matches(dataCenter))
+                                                          .collect(Collectors.toList());
+                tokenRangeMap.putAll(RangeUtils.calculateTokenRanges(dcInstances,
+                                                                     replicationFactor.getOptions().get(dataCenter),
+                                                                     partitioner));
+            }
+        }
+        else
+        {
+            throw new UnsupportedOperationException("Unsupported replication strategy");
+        }
+        return tokenRangeMap;
     }
 
     @NotNull
@@ -83,21 +149,21 @@ public final class RingUtils
         int dcOffset = 0;
         for (Map.Entry<String, Integer> rfForDC : rfByDC.entrySet())
         {
-            String datacenter = rfForDC.getKey();
-            for (int instance = 0; instance < instancesPerDc; instance++)
+            final String datacenter = rfForDC.getKey();
+            for (int i = 0; i < instancesPerDc; i++)
             {
-                instances.add(new RingInstance(new RingEntry.Builder()
-                                               .address("127.0." + dcOffset + "." + instance)
-                                               .datacenter(datacenter)
-                                               .load("0")
-                                               .token(Integer.toString(initialToken + dcOffset + 100_000 * instance))
-                                               .fqdn(datacenter + "-i" + instance)
-                                               .rack("Rack")
-                                               .hostId("")
-                                               .status("UP")
-                                               .state("NORMAL")
-                                               .owns("")
-                                               .build()));
+                RingEntry.Builder ringEntry = new RingEntry.Builder()
+                                              .address("127.0." + dcOffset + "." + i)
+                                              .datacenter(datacenter)
+                                              .load("0")
+                                              .token(Integer.toString(initialToken + dcOffset + 100_000 * i))
+                                              .fqdn(datacenter + "-i" + i)
+                                              .rack("Rack")
+                                              .hostId("")
+                                              .status("UP")
+                                              .state("NORMAL")
+                                              .owns("");
+                instances.add(new RingInstance(ringEntry.build()));
             }
             dcOffset++;
         }

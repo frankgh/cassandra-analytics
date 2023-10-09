@@ -33,6 +33,7 @@ import com.esotericsoftware.kryo.io.Output;
 import org.apache.cassandra.bridge.CassandraBridge;
 import org.apache.cassandra.bridge.CassandraBridgeFactory;
 import org.apache.cassandra.spark.bulkwriter.token.CassandraRing;
+import org.apache.cassandra.spark.bulkwriter.token.TokenRangeMapping;
 import org.apache.cassandra.spark.data.CqlTable;
 import org.apache.cassandra.spark.data.ReplicationFactor;
 import org.apache.cassandra.spark.data.partitioner.Partitioner;
@@ -64,12 +65,18 @@ public class CassandraBulkWriterContext implements BulkWriterContext, KryoSerial
         this.conf = conf;
         this.clusterInfo = clusterInfo;
         CassandraRing<RingInstance> ring = clusterInfo.getRing(true);
+        TokenRangeMapping<RingInstance> tokenRangeMapping = clusterInfo.getTokenRangeMapping(true);
         jobInfo = new CassandraJobInfo(conf,
-                                       new TokenPartitioner(ring, conf.numberSplits, sparkContext.defaultParallelism(), conf.getCores()));
+                                       new TokenPartitioner(tokenRangeMapping,
+                                                            ring,
+                                                            conf.numberSplits,
+                                                            sparkContext.defaultParallelism(),
+                                                            conf.getCores()));
         Preconditions.checkArgument(!conf.consistencyLevel.isLocal()
-                                    || (conf.localDC != null && ring.getReplicationFactor().getOptions().containsKey(conf.localDC)),
-                                    String.format("Keyspace %s is not replicated on datacenter %s",
-                                                  conf.keyspace, conf.localDC));
+                                    || (conf.localDC != null && ring.getReplicationFactor()
+                                                                    .getOptions()
+                                                                    .containsKey(conf.localDC)),
+                                    String.format("Keyspace %s is not replicated on datacenter %s", conf.keyspace, conf.localDC));
 
         String keyspace = conf.keyspace;
         String table = conf.table;

@@ -27,13 +27,13 @@ import java.util.NoSuchElementException;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.google.inject.Singleton;
-import org.apache.cassandra.sidecar.cluster.InstancesConfig;
-import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
-import org.apache.cassandra.sidecar.config.SidecarConfiguration;
-import org.apache.cassandra.sidecar.config.WorkerPoolConfiguration;
-import org.apache.cassandra.sidecar.config.yaml.ServiceConfigurationImpl;
-import org.apache.cassandra.sidecar.config.yaml.SidecarConfigurationImpl;
-import org.apache.cassandra.sidecar.config.yaml.WorkerPoolConfigurationImpl;
+import o.a.c.analytics.sidecar.shaded.testing.cluster.InstancesConfig;
+import o.a.c.analytics.sidecar.shaded.testing.cluster.instance.InstanceMetadata;
+import o.a.c.analytics.sidecar.shaded.testing.config.SidecarConfiguration;
+import o.a.c.analytics.sidecar.shaded.testing.config.WorkerPoolConfiguration;
+import o.a.c.analytics.sidecar.shaded.testing.config.yaml.ServiceConfigurationImpl;
+import o.a.c.analytics.sidecar.shaded.testing.config.yaml.SidecarConfigurationImpl;
+import o.a.c.analytics.sidecar.shaded.testing.config.yaml.WorkerPoolConfigurationImpl;
 
 /**
  * Provides the basic dependencies for integration tests

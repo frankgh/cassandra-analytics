@@ -27,23 +27,23 @@ import java.util.List;
 
 import com.datastax.driver.core.NettyOptions;
 import com.datastax.driver.core.Session;
+import o.a.c.analytics.sidecar.shaded.testing.adapters.base.CassandraFactory;
+import o.a.c.analytics.sidecar.shaded.testing.cluster.InstancesConfig;
+import o.a.c.analytics.sidecar.shaded.testing.cluster.InstancesConfigImpl;
+import o.a.c.analytics.sidecar.shaded.testing.cluster.instance.InstanceMetadata;
+import o.a.c.analytics.sidecar.shaded.testing.cluster.instance.InstanceMetadataImpl;
+import o.a.c.analytics.sidecar.shaded.testing.common.CQLSessionProvider;
+import o.a.c.analytics.sidecar.shaded.testing.common.CassandraAdapterDelegate;
+import o.a.c.analytics.sidecar.shaded.testing.common.CassandraVersionProvider;
+import o.a.c.analytics.sidecar.shaded.testing.common.JmxClient;
+import o.a.c.analytics.sidecar.shaded.testing.common.dns.DnsResolver;
+import o.a.c.analytics.sidecar.shaded.testing.common.utils.SidecarVersionProvider;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.IInstanceConfig;
 import org.apache.cassandra.distributed.api.IUpgradeableInstance;
 import org.apache.cassandra.distributed.shared.JMXUtil;
-import org.apache.cassandra.sidecar.adapters.base.CassandraFactory;
-import org.apache.cassandra.sidecar.cluster.InstancesConfig;
-import org.apache.cassandra.sidecar.cluster.InstancesConfigImpl;
-import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
-import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadataImpl;
-import org.apache.cassandra.sidecar.common.CQLSessionProvider;
-import org.apache.cassandra.sidecar.common.CassandraAdapterDelegate;
-import org.apache.cassandra.sidecar.common.CassandraVersionProvider;
-import org.apache.cassandra.sidecar.common.JmxClient;
-import org.apache.cassandra.sidecar.common.SimpleCassandraVersion;
-import org.apache.cassandra.sidecar.common.dns.DnsResolver;
-import org.apache.cassandra.sidecar.common.utils.SidecarVersionProvider;
 import org.apache.cassandra.testing.AbstractCassandraTestContext;
+import org.apache.cassandra.testing.SimpleCassandraVersion;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -228,13 +228,13 @@ public class CassandraSidecarTestContext implements AutoCloseable
             Path stagingPath = dataDirParentPath.resolve("staging");
             String uploadsStagingDirectory = stagingPath.toFile().getAbsolutePath();
             metadata.add(InstanceMetadataImpl.builder()
-                         .id(i + 1)
-                         .host(config.broadcastAddress().getAddress().getHostAddress())
-                         .port(nativeTransportPort)
-                         .dataDirs(Arrays.asList(dataDirectories))
-                         .stagingDir(uploadsStagingDirectory)
-                         .delegate(delegate)
-                         .build());
+                                             .id(i + 1)
+                                             .host(config.broadcastAddress().getAddress().getHostAddress())
+                                             .port(nativeTransportPort)
+                                             .dataDirs(Arrays.asList(dataDirectories))
+                                             .stagingDir(uploadsStagingDirectory)
+                                             .delegate(delegate)
+                                             .build());
         }
         return new InstancesConfigImpl(metadata, dnsResolver);
     }

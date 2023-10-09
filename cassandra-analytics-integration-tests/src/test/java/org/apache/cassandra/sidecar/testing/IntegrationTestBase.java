@@ -33,11 +33,13 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.Uninterruptibles;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.datastax.driver.core.KeyspaceMetadata;
 import com.datastax.driver.core.Session;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
@@ -46,11 +48,11 @@ import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpServer;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.junit5.VertxTestContext;
-import org.apache.cassandra.sidecar.MainModule;
-import org.apache.cassandra.sidecar.cluster.InstancesConfig;
-import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
-import org.apache.cassandra.sidecar.common.data.QualifiedTableName;
-import org.apache.cassandra.sidecar.common.dns.DnsResolver;
+import o.a.c.analytics.sidecar.shaded.testing.MainModule;
+import o.a.c.analytics.sidecar.shaded.testing.cluster.InstancesConfig;
+import o.a.c.analytics.sidecar.shaded.testing.cluster.instance.InstanceMetadata;
+import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
+import o.a.c.analytics.sidecar.shaded.testing.common.dns.DnsResolver;
 import org.apache.cassandra.testing.AbstractCassandraTestContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,6 +64,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public abstract class IntegrationTestBase
 {
+    private static final int MAX_KEYSPACE_TABLE_WAIT_ATTEMPTS = 100;
+    private static final long MAX_KEYSPACE_TABLE_TIME = 100L;
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
     protected Vertx vertx;
     protected HttpServer server;
@@ -188,5 +192,44 @@ public abstract class IntegrationTestBase
     {
         instancesConfig.instances()
                        .forEach(instanceMetadata -> instanceMetadata.delegate().healthCheck());
+    }
+
+    /**
+     * Waits for the specified keyspace/table to be available.
+     * Emperically, this loop usually executes either zero or one time before completing.
+     * However, we set a fairly high number of retries to account for variability in build machines.
+     *
+     * @param keyspaceName the keyspace for which to wait
+     * @param tableName    the table in the keyspace for which to wait
+     */
+    protected void waitForKeyspaceAndTable(String keyspaceName, String tableName)
+    {
+        int numInstances = sidecarTestContext.instancesConfig().instances().size();
+        int retries = MAX_KEYSPACE_TABLE_WAIT_ATTEMPTS;
+        boolean sidecarMissingSchema = true;
+        while (sidecarMissingSchema && retries-- > 0)
+        {
+            sidecarMissingSchema = false;
+            for (int i = 0; i < numInstances; i++)
+            {
+                KeyspaceMetadata keyspace = sidecarTestContext.session(i)
+                                                              .getCluster()
+                                                              .getMetadata()
+                                                              .getKeyspace(keyspaceName);
+                sidecarMissingSchema |= (keyspace == null || keyspace.getTable(tableName) == null);
+            }
+            if (sidecarMissingSchema)
+            {
+                logger.info("Keyspace/table {}/{} not yet available - waiting...", keyspaceName, tableName);
+                Uninterruptibles.sleepUninterruptibly(MAX_KEYSPACE_TABLE_TIME, TimeUnit.MILLISECONDS);
+            }
+            else
+            {
+                return;
+            }
+        }
+        throw new RuntimeException(
+        String.format("Keyspace/table %s/%s did not become visible on all sidecar instances",
+                      keyspaceName, tableName));
     }
 }

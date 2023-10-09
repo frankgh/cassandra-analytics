@@ -87,7 +87,7 @@ public class MockBulkWriterContext implements BulkWriterContext, ClusterInfo, Jo
     private final Set<CassandraInstance> cleanCalledForInstance = Collections.synchronizedSet(new HashSet<>());
     private boolean instancesAreAvailable = true;
     private boolean cleanShouldThrow = false;
-    private final CassandraRing<RingInstance> ring;
+    private final CassandraRing ring;
     private final TokenPartitioner tokenPartitioner;
     private final String cassandraVersion;
     private CommitResultSupplier crSupplier = (uuids, dc) -> new RemoteCommitResult(true, Collections.emptyList(), uuids, null);
@@ -95,8 +95,8 @@ public class MockBulkWriterContext implements BulkWriterContext, ClusterInfo, Jo
     private Predicate<CassandraInstance> uploadRequestConsumer = instance -> true;
     private TTLOption ttlOption = TTLOption.forever();
 
-    public MockBulkWriterContext(CassandraRing<RingInstance> ring,
-                                 TokenRangeMapping<RingInstance> tokenRangeMapping,
+    public MockBulkWriterContext(CassandraRing ring,
+                                 TokenRangeMapping tokenRangeMapping,
                                  String cassandraVersion,
                                  ConsistencyLevel.CL consistencyLevel)
     {
@@ -145,7 +145,7 @@ public class MockBulkWriterContext implements BulkWriterContext, ClusterInfo, Jo
         this.jobId = java.util.UUID.randomUUID();
     }
 
-    public MockBulkWriterContext(CassandraRing<RingInstance>> ring, TokenRangeMapping<RingInstance> tokenRangeMapping)
+    public MockBulkWriterContext(CassandraRing ring, TokenRangeMapping<RingInstance> tokenRangeMapping)
     {
         this(ring, tokenRangeMapping, DEFAULT_CASSANDRA_VERSION, ConsistencyLevel.CL.LOCAL_QUORUM);
     }
@@ -267,7 +267,7 @@ public class MockBulkWriterContext implements BulkWriterContext, ClusterInfo, Jo
     }
 
     @Override
-    public CassandraRing<RingInstance> getRing(boolean cached)
+    public CassandraRing getRing(boolean cached)
     {
         return ring;
     }

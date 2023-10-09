@@ -82,6 +82,7 @@ public final class RingUtils
                                                                                        i.getRingInstance().status(),
                                                                                        i.getNodeName(),
                                                                                        i.getIpAddress(),
+                                                                                       7000,
                                                                                        i.getDataCenter()))
                                                 .collect(Collectors.toList());
 

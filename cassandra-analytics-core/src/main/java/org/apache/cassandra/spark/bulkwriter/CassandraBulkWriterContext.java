@@ -64,7 +64,7 @@ public class CassandraBulkWriterContext implements BulkWriterContext, KryoSerial
     {
         this.conf = conf;
         this.clusterInfo = clusterInfo;
-        CassandraRing<RingInstance> ring = clusterInfo.getRing(true);
+        CassandraRing ring = clusterInfo.getRing(true);
         TokenRangeMapping<RingInstance> tokenRangeMapping = clusterInfo.getTokenRangeMapping(true);
         jobInfo = new CassandraJobInfo(conf,
                                        new TokenPartitioner(tokenRangeMapping,

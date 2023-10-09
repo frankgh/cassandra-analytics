@@ -107,7 +107,6 @@ public class RecordWriter implements Serializable
     public List<StreamResult> write(Iterator<Tuple2<DecoratedKey, Object[]>> sourceIterator)
     {
         TaskContext taskContext = taskContextSupplier.get();
-        StreamSession streamSession = null;
         Range<BigInteger> taskTokenRange = getTokenRange(taskContext);
         TokenRangeMapping<RingInstance> tokenRangeMapping = writerContext.cluster().getTokenRangeMapping(false);
         Set<RingInstance> initialTokenRangeInstances = getTokenRangeInstances(tokenRangeMapping, taskTokenRange);

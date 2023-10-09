@@ -27,11 +27,11 @@ import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Session;
+import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.ResiliencyTestBase;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.IUpgradeableInstance;
 import org.apache.cassandra.distributed.shared.ClusterUtils;
-import org.apache.cassandra.sidecar.common.data.QualifiedTableName;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.DataFrameWriter;
@@ -100,7 +100,7 @@ class LeavingBaseTest extends ResiliencyTestBase
     {
         List<String> sidecarInstances = new ArrayList<>();
         sidecarInstances.add("localhost");
-        for(int i = 2; i <= numNodes; i++)
+        for (int i = 2; i <= numNodes; i++)
         {
             sidecarInstances.add("localhost" + i);
         }
@@ -126,9 +126,12 @@ class LeavingBaseTest extends ResiliencyTestBase
                                           .option("number_splits", "-1")
                                           .mode("append");
 
-        if (isCrossDCKeyspace) {
+        if (isCrossDCKeyspace)
+        {
             dfWriter.option("bulk_writer_cl", "QUORUM");
-        } else {
+        }
+        else
+        {
             dfWriter.option("local_dc", "datacenter1")
                     .option("bulk_writer_cl", "LOCAL_QUORUM");
         }

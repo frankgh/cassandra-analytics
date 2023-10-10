@@ -63,6 +63,7 @@ import org.apache.cassandra.spark.data.partitioner.Partitioner;
 import org.apache.cassandra.spark.utils.CqlUtils;
 import org.apache.cassandra.spark.utils.FutureUtils;
 import org.jetbrains.annotations.NotNull;
+import org.sparkproject.guava.net.HostAndPort;
 
 public class CassandraClusterInfo implements ClusterInfo, Closeable
 {
@@ -524,9 +525,11 @@ public class CassandraClusterInfo implements ClusterInfo, Closeable
             {
                 // For each writeReplica, get metadata and update map to include range
                 dcReplicaEntry.getValue().forEach(ipAddress -> {
-
+                    HostAndPort hap = HostAndPort.fromString(ipAddress);
                     // Get metadata for this IP; Create RingInstance
-                    ReplicaMetadata replica = replicaMetadata.stream().filter(r -> r.address().equals(ipAddress)).findFirst().get();
+                    ReplicaMetadata replica = replicaMetadata.stream()
+                                                             .filter(r -> r.address().equals(hap.getHostText()))
+                                                             .findFirst().get();
                     instanceToRangeMap.put(new RingInstance(replica), range);
                 });
             }

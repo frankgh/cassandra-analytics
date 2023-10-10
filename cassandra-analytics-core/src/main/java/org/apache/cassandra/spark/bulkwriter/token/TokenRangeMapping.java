@@ -180,7 +180,7 @@ public class TokenRangeMapping<Instance extends CassandraInstance> implements Se
     private void populateReplicas()
     {
         // Calculate token range to replica mapping
-        this.replicasByTokenRange.put(Range.closed(this.partitioner.minToken(), this.partitioner.maxToken()), Collections.emptyList());
+        this.replicasByTokenRange.put(Range.openClosed(this.partitioner.minToken(), this.partitioner.maxToken()), Collections.emptyList());
         this.tokenRangeMap.asMap().forEach((inst, ranges) -> ranges.forEach(range -> addReplica(inst, range, this.replicasByTokenRange)));
     }
 

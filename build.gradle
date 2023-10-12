@@ -199,7 +199,6 @@ subprojects {
     }
     // uncomment the line below for local development
     // mavenLocal()
-
   }
 
   dependencies {

@@ -68,8 +68,7 @@ public class TokenRangeMapping<Instance extends CassandraInstance> implements Se
         this.replacementInstances = replacementInstances;
         this.replicaMetadata = replicaMetadata;
         // Populate reverse mapping of ranges to replicas
-        this.replicasByTokenRange = TreeRangeMap.create();
-        populateReplicas();
+        this.replicasByTokenRange = populateReplicas();
     }
 
     /**
@@ -177,11 +176,15 @@ public class TokenRangeMapping<Instance extends CassandraInstance> implements Se
         return this.tokenRangeMap;
     }
 
-    private void populateReplicas()
+    private RangeMap<BigInteger, List<Instance>> populateReplicas()
     {
+        RangeMap<BigInteger, List<Instance>> replicaRangeMap = TreeRangeMap.create();
         // Calculate token range to replica mapping
-        this.replicasByTokenRange.put(Range.openClosed(this.partitioner.minToken(), this.partitioner.maxToken()), Collections.emptyList());
-        this.tokenRangeMap.asMap().forEach((inst, ranges) -> ranges.forEach(range -> addReplica(inst, range, this.replicasByTokenRange)));
+         replicaRangeMap.put(Range.openClosed(this.partitioner.minToken(),
+                                              this.partitioner.maxToken()),
+                             Collections.emptyList());
+        this.tokenRangeMap.asMap().forEach((inst, ranges) -> ranges.forEach(range -> addReplica(inst, range, replicaRangeMap)));
+        return replicaRangeMap;
     }
 
     @Override

@@ -78,13 +78,14 @@ public final class RingUtils
             return value;
         });
 
-        List<ReplicaMetadata> replicaMetadata = instances.stream().map(i -> new ReplicaMetadata(i.getRingInstance().state(),
+        List<ReplicaMetadata> replicaMetadata = instances.stream()
+                                                         .map(i -> new ReplicaMetadata(i.getRingInstance().state(),
                                                                                        i.getRingInstance().status(),
                                                                                        i.getNodeName(),
                                                                                        i.getIpAddress(),
-                                                                                       7000,
+                                                                                       7012,
                                                                                        i.getDataCenter()))
-                                                .collect(Collectors.toList());
+                                                         .collect(Collectors.toList());
 
         Multimap<RingInstance, Range<BigInteger>> tokenRanges = setupTokenRangeMap(Partitioner.Murmur3Partitioner, replicationFactor, instances);
         return new TokenRangeMapping<>(Partitioner.Murmur3Partitioner,
@@ -157,6 +158,7 @@ public final class RingUtils
                                               .address("127.0." + dcOffset + "." + i)
                                               .datacenter(datacenter)
                                               .load("0")
+                                              // Single DC tokens will be in multiples of 100000
                                               .token(Integer.toString(initialToken + dcOffset + 100_000 * i))
                                               .fqdn(datacenter + "-i" + i)
                                               .rack("Rack")

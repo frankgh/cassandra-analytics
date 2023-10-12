@@ -39,6 +39,7 @@ import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.implementation.bind.annotation.SuperCall;
 import net.bytebuddy.pool.TypePool;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
+import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.Feature;
 import org.apache.cassandra.distributed.api.IUpgradeableInstance;

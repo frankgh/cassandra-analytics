@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra.expansion;
+package org.apache.cassandra.analytics.expansion;
 
 import java.util.Collection;
 import java.util.concurrent.Callable;
@@ -43,42 +43,41 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
 @ExtendWith(VertxExtension.class)
-public class JoiningTestMultiDC extends JoiningBaseTest
+public class JoiningTestMultiDCSingleReplicated extends JoiningBaseTest
 {
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void validateBulkWrittenDataDoubleClusterSizeMultiDC(ConfigurableCassandraTestContext cassandraTestContext)
-    throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void validateBulkWrittenData(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
-        BBHelperDoubleClusterMultiDC.reset();
-        UpgradeableCluster cluster = getMultiDCCluster(BBHelperDoubleClusterMultiDC::install, cassandraTestContext);
+        BBHelperMultiDC.reset();
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext);
 
-        runJoiningTestScenario(BBHelperDoubleClusterMultiDC.transientStateStart,
-                               BBHelperDoubleClusterMultiDC.transientStateEnd,
+        runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
+                               BBHelperMultiDC.transientStateEnd,
                                cluster,
-                               true);
+                               false);
     }
 
     /**
      * ByteBuddy helper for multiple joining nodes
      */
     @Shared
-    public static class BBHelperDoubleClusterMultiDC
+    public static class BBHelperMultiDC
     {
-        static CountDownLatch transientStateStart = new CountDownLatch(6);
-        static CountDownLatch transientStateEnd = new CountDownLatch(6);
+        static CountDownLatch transientStateStart = new CountDownLatch(2);
+        static CountDownLatch transientStateEnd = new CountDownLatch(2);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
-            // Test case involves doubling the size of a 6 node cluster (3 per DC)
-            // We intercept the bootstrap of nodes (7-12) to validate token ranges
-            if (nodeNumber > 6)
+            // Test case involves adding 2 nodes to a 10 node cluster (5 per DC)
+            // We intercept the bootstrap of nodes (11,12) to validate token ranges
+            if (nodeNumber > 10)
             {
                 TypePool typePool = TypePool.Default.of(cl);
                 TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
                                .method(named("bootstrap").and(takesArguments(2)))
-                               .intercept(MethodDelegation.to(BBHelperDoubleClusterMultiDC.class))
+                               .intercept(MethodDelegation.to(BBHelperMultiDC.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);
@@ -98,8 +97,8 @@ public class JoiningTestMultiDC extends JoiningBaseTest
 
         public static void reset()
         {
-            transientStateStart = new CountDownLatch(6);
-            transientStateEnd = new CountDownLatch(6);
+            transientStateStart = new CountDownLatch(2);
+            transientStateEnd = new CountDownLatch(2);
         }
     }
 }

@@ -68,7 +68,7 @@ public class BulkWriteValidator
         else
         {
             String message = String.format("Failed to load %s ranges with %s for job %s in phase %s.",
-                                                 failedRanges.size(), job.getConsistencyLevel(), job.getId(), phase);
+                                           failedRanges.size(), job.getConsistencyLevel(), job.getId(), phase);
             logger.error(message);
             failedRanges.forEach(failedRange ->
                                  failedRange.getValue()

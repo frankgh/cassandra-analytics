@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra.shrink;
+package org.apache.cassandra.analytics.shrink;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -34,7 +34,7 @@ import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.implementation.bind.annotation.SuperCall;
 import net.bytebuddy.pool.TypePool;
-import org.apache.cassandra.TestTokenSupplier;
+import org.apache.cassandra.analytics.TestTokenSupplier;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.TokenSupplier;
 import org.apache.cassandra.testing.CassandraIntegrationTest;

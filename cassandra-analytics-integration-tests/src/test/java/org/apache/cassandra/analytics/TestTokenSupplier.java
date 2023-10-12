@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra;
+package org.apache.cassandra.analytics;
 
 import java.math.BigInteger;
 import java.util.ArrayList;

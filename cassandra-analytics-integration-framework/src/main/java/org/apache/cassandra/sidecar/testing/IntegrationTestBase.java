@@ -69,7 +69,7 @@ public abstract class IntegrationTestBase
     protected Vertx vertx;
     protected HttpServer server;
 
-    protected static final String TEST_KEYSPACE = "testkeyspace";
+    protected static final String TEST_KEYSPACE = "spark_test";
     private static final String TEST_TABLE_PREFIX = "testtable";
 
     protected static final int DEFAULT_RF = 3;

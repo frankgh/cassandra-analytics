@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra.expansion;
+package org.apache.cassandra.analytics.expansion;
 
 import java.util.Collection;
 import java.util.concurrent.Callable;
@@ -34,6 +34,7 @@ import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.implementation.bind.annotation.SuperCall;
 import net.bytebuddy.pool.TypePool;
+import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
 import org.apache.cassandra.utils.Shared;
@@ -42,39 +43,42 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
 @ExtendWith(VertxExtension.class)
-public class JoiningTestSingleNode extends JoiningBaseTest
+public class JoiningTestMultiDC extends JoiningBaseTest
 {
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void validateBulkWrittenData(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void validateBulkWrittenDataDoubleClusterSizeMultiDC(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
     {
-        BBHelperSingleJoiningNode.reset();
-        runJoiningTestScenario(cassandraTestContext,
-                               BBHelperSingleJoiningNode::install,
-                               BBHelperSingleJoiningNode.transientStateStart,
-                               BBHelperSingleJoiningNode.transientStateEnd);
+        BBHelperDoubleClusterMultiDC.reset();
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperDoubleClusterMultiDC::install, cassandraTestContext);
+
+        runJoiningTestScenario(BBHelperDoubleClusterMultiDC.transientStateStart,
+                               BBHelperDoubleClusterMultiDC.transientStateEnd,
+                               cluster,
+                               true);
     }
 
     /**
-     * ByteBuddy helper for a single joining node
+     * ByteBuddy helper for multiple joining nodes
      */
     @Shared
-    public static class BBHelperSingleJoiningNode
+    public static class BBHelperDoubleClusterMultiDC
     {
-        static CountDownLatch transientStateStart = new CountDownLatch(1);
-        static CountDownLatch transientStateEnd = new CountDownLatch(1);
+        static CountDownLatch transientStateStart = new CountDownLatch(6);
+        static CountDownLatch transientStateEnd = new CountDownLatch(6);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
-            // Test case involves 3 node cluster with 1 joining node
-            // We intercept the bootstrap of the leaving node (4) to validate token ranges
-            if (nodeNumber == 4)
+            // Test case involves doubling the size of a 6 node cluster (3 per DC)
+            // We intercept the bootstrap of nodes (7-12) to validate token ranges
+            if (nodeNumber > 6)
             {
                 TypePool typePool = TypePool.Default.of(cl);
                 TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
                                .method(named("bootstrap").and(takesArguments(2)))
-                               .intercept(MethodDelegation.to(BBHelperSingleJoiningNode.class))
+                               .intercept(MethodDelegation.to(BBHelperDoubleClusterMultiDC.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);
@@ -94,8 +98,8 @@ public class JoiningTestSingleNode extends JoiningBaseTest
 
         public static void reset()
         {
-            transientStateStart = new CountDownLatch(1);
-            transientStateEnd = new CountDownLatch(1);
+            transientStateStart = new CountDownLatch(6);
+            transientStateEnd = new CountDownLatch(6);
         }
     }
 }

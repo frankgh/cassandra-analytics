@@ -29,11 +29,6 @@ project(':cassandra-analytics-core') {
         withSourcesJar()
     }
 
-    repositories {
-        mavenCentral()
-        // uncomment the line below for local development
-        // mavenLocal()
-    }
     publishing {
         publications {
             maven(MavenPublication) {

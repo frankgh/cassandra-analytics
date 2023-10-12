@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra.shrink;
+package org.apache.cassandra.analytics.expansion;
 
+import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
@@ -33,69 +34,68 @@ import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.implementation.bind.annotation.SuperCall;
 import net.bytebuddy.pool.TypePool;
-import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
 import org.apache.cassandra.utils.Shared;
 
 import static net.bytebuddy.matcher.ElementMatchers.named;
+import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
 @ExtendWith(VertxExtension.class)
-class LeavingTestMultiDC extends LeavingBaseTest
+public class JoiningTestSingleNode extends JoiningBaseTest
 {
-    @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void validateBulkWrittenWithLeavingNodesMultiDC(ConfigurableCassandraTestContext cassandraTestContext)
-    throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    void validateBulkWrittenData(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
-        BBHelperLeavingNodesMultiDC.reset();
-        int leavingNodesPerDC = 1;
-        UpgradeableCluster cluster = getMultiDCCluster(BBHelperLeavingNodesMultiDC::install, cassandraTestContext);
-
-        runLeavingTestScenario(leavingNodesPerDC,
-                               BBHelperLeavingNodesMultiDC.transientStateStart,
-                               BBHelperLeavingNodesMultiDC.transientStateEnd,
-                               cluster);
+        BBHelperSingleJoiningNode.reset();
+        runJoiningTestScenario(cassandraTestContext,
+                               BBHelperSingleJoiningNode::install,
+                               BBHelperSingleJoiningNode.transientStateStart,
+                               BBHelperSingleJoiningNode.transientStateEnd);
     }
 
     /**
-     * ByteBuddy helper for multiple leaving nodes multi-DC
+     * ByteBuddy helper for a single joining node
      */
     @Shared
-    public static class BBHelperLeavingNodesMultiDC
+    public static class BBHelperSingleJoiningNode
     {
-        static CountDownLatch transientStateStart = new CountDownLatch(2);
-        static CountDownLatch transientStateEnd = new CountDownLatch(2);
+        static CountDownLatch transientStateStart = new CountDownLatch(1);
+        static CountDownLatch transientStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
-            // Test case involves 10 node cluster (5 nodes per DC) with a 2 leaving nodes (1 per DC)
-            // We intercept the shutdown of the leaving nodes (9, 10) to validate token ranges
-            if (nodeNumber > 8)
+            // Test case involves 3 node cluster with 1 joining node
+            // We intercept the bootstrap of the leaving node (4) to validate token ranges
+            if (nodeNumber == 4)
             {
                 TypePool typePool = TypePool.Default.of(cl);
                 TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
-                               .method(named("unbootstrap"))
-                               .intercept(MethodDelegation.to(BBHelperLeavingNodesMultiDC.class))
+                               .method(named("bootstrap").and(takesArguments(2)))
+                               .intercept(MethodDelegation.to(BBHelperSingleJoiningNode.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);
             }
         }
 
-        @SuppressWarnings("unused")
-        public static void unbootstrap(@SuperCall Callable<?> orig) throws Exception
+        public static boolean bootstrap(Collection<?> tokens,
+                                        long bootstrapTimeoutMillis,
+                                        @SuperCall Callable<Boolean> orig) throws Exception
         {
+            boolean result = orig.call();
+            // trigger bootstrap start and wait until bootstrap is ready from test
             transientStateStart.countDown();
             Uninterruptibles.awaitUninterruptibly(transientStateEnd);
-            orig.call();
+            return result;
         }
 
         public static void reset()
         {
-            transientStateStart = new CountDownLatch(2);
-            transientStateEnd = new CountDownLatch(2);
+            transientStateStart = new CountDownLatch(1);
+            transientStateEnd = new CountDownLatch(1);
         }
     }
 }

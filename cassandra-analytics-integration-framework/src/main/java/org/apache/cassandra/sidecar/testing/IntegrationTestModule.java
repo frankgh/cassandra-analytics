@@ -19,7 +19,9 @@
 package org.apache.cassandra.sidecar.testing;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 
 import com.google.inject.AbstractModule;
@@ -28,8 +30,10 @@ import com.google.inject.Singleton;
 import org.apache.cassandra.sidecar.cluster.InstancesConfig;
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
 import org.apache.cassandra.sidecar.config.SidecarConfiguration;
+import org.apache.cassandra.sidecar.config.WorkerPoolConfiguration;
 import org.apache.cassandra.sidecar.config.yaml.ServiceConfigurationImpl;
 import org.apache.cassandra.sidecar.config.yaml.SidecarConfigurationImpl;
+import org.apache.cassandra.sidecar.config.yaml.WorkerPoolConfigurationImpl;
 
 /**
  * Provides the basic dependencies for integration tests
@@ -66,7 +70,7 @@ public class IntegrationTestModule extends AbstractModule
         {
             if (cassandraTestContext.isClusterBuilt())
             {
-                return cassandraTestContext.instancesConfig.instances();
+                return cassandraTestContext.instancesConfig().instances();
             }
             return Collections.emptyList();
         }
@@ -80,7 +84,7 @@ public class IntegrationTestModule extends AbstractModule
          */
         public InstanceMetadata instanceFromId(int id) throws NoSuchElementException
         {
-            return cassandraTestContext.instancesConfig.instanceFromId(id);
+            return cassandraTestContext.instancesConfig().instanceFromId(id);
         }
 
         /**
@@ -92,7 +96,7 @@ public class IntegrationTestModule extends AbstractModule
          */
         public InstanceMetadata instanceFromHost(String host) throws NoSuchElementException
         {
-            return cassandraTestContext.instancesConfig.instanceFromHost(host);
+            return cassandraTestContext.instancesConfig().instanceFromHost(host);
         }
     }
 
@@ -100,6 +104,16 @@ public class IntegrationTestModule extends AbstractModule
     @Singleton
     public SidecarConfiguration sidecarConfiguration()
     {
+        Map<String, WorkerPoolConfiguration> workerPoolConfigMap = Collections.unmodifiableMap(new HashMap<>()
+        {
+            {
+                WorkerPoolConfiguration workerPoolConfiguration = new WorkerPoolConfigurationImpl("test-pool",
+                                                                                                  10,
+                                                                                                  30000);
+                this.put("service", workerPoolConfiguration);
+                this.put("internal", workerPoolConfiguration);
+            }
+        });
         return new SidecarConfigurationImpl(new ServiceConfigurationImpl("127.0.0.1"));
     }
 }

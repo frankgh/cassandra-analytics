@@ -266,7 +266,7 @@ public class RecordWriterTest
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, false);
         RuntimeException ex = assertThrows(RuntimeException.class, () -> rw.write(data));
         assertEquals(ex.getMessage(), "java.lang.IllegalStateException: Received Token "
-                                      + "5765203080415074583 outside of expected range [-9223372036854775808‥100000]");
+                                      + "5765203080415074583 outside of expected range [-9223372036854775807‥100000]");
     }
 
     @Test

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra;
+package org.apache.cassandra.analytics;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -182,7 +182,7 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         });
     }
 
-    QualifiedTableName bulkWriteData()
+    protected QualifiedTableName bulkWriteData()
     {
         ImmutableMap<String, Integer> rf = ImmutableMap.of("datacenter1", 3);
         QualifiedTableName schema = initializeSchema(rf);

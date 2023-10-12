@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra.expansion;
+package org.apache.cassandra.analytics.expansion;
 
 import java.util.Collection;
 import java.util.concurrent.Callable;
@@ -42,39 +42,40 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
 @ExtendWith(VertxExtension.class)
-public class JoiningTestDoubleCluster extends JoiningBaseTest
+public class JoiningTestMultipleNodes extends JoiningBaseTest
 {
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void validateBulkWrittenDataDoubleClusterSize(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
+    void validateBulkWrittenData(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
     {
-        BBHelperDoubleClusterSize.reset();
+        BBHelperMultipleJoiningNodes.reset();
         runJoiningTestScenario(cassandraTestContext,
-                               BBHelperDoubleClusterSize::install,
-                               BBHelperDoubleClusterSize.transientStateStart,
-                               BBHelperDoubleClusterSize.transientStateEnd);
+                               BBHelperMultipleJoiningNodes::install,
+                               BBHelperMultipleJoiningNodes.transientStateStart,
+                               BBHelperMultipleJoiningNodes.transientStateEnd);
     }
 
     /**
-     * ByteBuddy helper for doubling cluster size
+     * ByteBuddy helper for multiple joining nodes
      */
     @Shared
-    public static class BBHelperDoubleClusterSize
+    public static class BBHelperMultipleJoiningNodes
     {
-        static CountDownLatch transientStateStart = new CountDownLatch(5);
-        static CountDownLatch transientStateEnd = new CountDownLatch(5);
+        static CountDownLatch transientStateStart = new CountDownLatch(2);
+        static CountDownLatch transientStateEnd = new CountDownLatch(2);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
-            // Test case involves 5 node cluster doubling in size
-            // We intercept the bootstrap of the new nodes (6-10) to validate token ranges
-            if (nodeNumber > 5)
+            // Test case involves 3 node cluster with a 2 joining nodes
+            // We intercept the joining of nodes (4, 5) to validate token ranges
+            if (nodeNumber > 3)
             {
                 TypePool typePool = TypePool.Default.of(cl);
                 TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
                                .method(named("bootstrap").and(takesArguments(2)))
-                               .intercept(MethodDelegation.to(BBHelperDoubleClusterSize.class))
+                               .intercept(MethodDelegation.to(BBHelperMultipleJoiningNodes.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);
@@ -94,8 +95,8 @@ public class JoiningTestDoubleCluster extends JoiningBaseTest
 
         public static void reset()
         {
-            transientStateStart = new CountDownLatch(5);
-            transientStateEnd = new CountDownLatch(5);
+            transientStateStart = new CountDownLatch(2);
+            transientStateEnd = new CountDownLatch(2);
         }
     }
 }

@@ -56,7 +56,7 @@ import scala.Tuple2;
 
 import static org.apache.cassandra.spark.utils.ScalaConversionUtils.asScalaIterator;
 
-@SuppressWarnings({"ConstantConditions"})
+@SuppressWarnings({ "ConstantConditions" })
 public class RecordWriter implements Serializable
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(RecordWriter.class);

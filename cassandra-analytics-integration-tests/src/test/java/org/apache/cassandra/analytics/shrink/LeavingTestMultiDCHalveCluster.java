@@ -16,9 +16,8 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra.expansion;
+package org.apache.cassandra.analytics.shrink;
 
-import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
@@ -40,65 +39,62 @@ import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
 import org.apache.cassandra.utils.Shared;
 
 import static net.bytebuddy.matcher.ElementMatchers.named;
-import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
 @ExtendWith(VertxExtension.class)
-public class JoiningTestMultiDCSingleReplicated extends JoiningBaseTest
+class LeavingTestMultiDCHalveCluster extends LeavingBaseTest
 {
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void validateBulkWrittenData(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void validateBulkWrittenMultiDCHalveClusterSize(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
-        BBHelperMultiDC.reset();
-        UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext);
+        BBHelperHalveClusterMultiDC.reset();
+        int leavingNodesPerDC = 3;
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperHalveClusterMultiDC::install, cassandraTestContext);
 
-        runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
-                               BBHelperMultiDC.transientStateEnd,
-                               cluster,
-                               false);
+        runLeavingTestScenario(leavingNodesPerDC,
+                               BBHelperHalveClusterMultiDC.transientStateStart,
+                               BBHelperHalveClusterMultiDC.transientStateEnd,
+                               cluster);
     }
 
     /**
-     * ByteBuddy helper for multiple joining nodes
+     * ByteBuddy helper for halve cluster size with multi-DC
      */
     @Shared
-    public static class BBHelperMultiDC
+    public static class BBHelperHalveClusterMultiDC
     {
-        static CountDownLatch transientStateStart = new CountDownLatch(2);
-        static CountDownLatch transientStateEnd = new CountDownLatch(2);
+        static CountDownLatch transientStateStart = new CountDownLatch(6);
+        static CountDownLatch transientStateEnd = new CountDownLatch(6);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
-            // Test case involves adding 2 nodes to a 10 node cluster (5 per DC)
-            // We intercept the bootstrap of nodes (11,12) to validate token ranges
-            if (nodeNumber > 10)
+            // Test case involves halving the size of a 12 node cluster (6 per DC)
+            // We intercept the shutdown of the removed nodes (7-12) to validate token ranges
+            if (nodeNumber > 6)
             {
                 TypePool typePool = TypePool.Default.of(cl);
                 TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
-                               .method(named("bootstrap").and(takesArguments(2)))
-                               .intercept(MethodDelegation.to(BBHelperMultiDC.class))
+                               .method(named("unbootstrap"))
+                               .intercept(MethodDelegation.to(BBHelperHalveClusterMultiDC.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);
             }
         }
 
-        public static boolean bootstrap(Collection<?> tokens,
-                                        long bootstrapTimeoutMillis,
-                                        @SuperCall Callable<Boolean> orig) throws Exception
+        @SuppressWarnings("unused")
+        public static void unbootstrap(@SuperCall Callable<?> orig) throws Exception
         {
-            boolean result = orig.call();
-            // trigger bootstrap start and wait until bootstrap is ready from test
             transientStateStart.countDown();
             Uninterruptibles.awaitUninterruptibly(transientStateEnd);
-            return result;
+            orig.call();
         }
 
         public static void reset()
         {
-            transientStateStart = new CountDownLatch(2);
-            transientStateEnd = new CountDownLatch(2);
+            transientStateStart = new CountDownLatch(6);
+            transientStateEnd = new CountDownLatch(6);
         }
     }
 }

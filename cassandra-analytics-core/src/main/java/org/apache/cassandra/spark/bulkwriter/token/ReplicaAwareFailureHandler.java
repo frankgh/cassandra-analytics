@@ -86,6 +86,7 @@ public class ReplicaAwareFailureHandler<Instance extends CassandraInstance>
     /**
      * Given the number of failed instances for each token range, validates if the consistency guarantees are maintained
      * for the size of the ring and the consistency level.
+     *
      * @return list of failed entries for token ranges that break consistency. This should ideally be empty for a
      * successful operation.
      */

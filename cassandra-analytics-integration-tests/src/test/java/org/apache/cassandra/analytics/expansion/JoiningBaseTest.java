@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra.expansion;
+package org.apache.cassandra.analytics.expansion;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,8 +30,8 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Session;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
-import org.apache.cassandra.ResiliencyTestBase;
-import org.apache.cassandra.TestTokenSupplier;
+import org.apache.cassandra.analytics.ResiliencyTestBase;
+import org.apache.cassandra.analytics.TestTokenSupplier;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.Feature;
 import org.apache.cassandra.distributed.api.IUpgradeableInstance;
@@ -53,7 +53,6 @@ public class JoiningBaseTest extends ResiliencyTestBase
                                 CountDownLatch transientStateEnd,
                                 UpgradeableCluster cluster,
                                 boolean isCrossDCKeyspace)
-    throws Exception
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         QualifiedTableName table = null;

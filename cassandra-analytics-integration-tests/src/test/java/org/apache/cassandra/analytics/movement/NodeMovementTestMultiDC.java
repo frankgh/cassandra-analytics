@@ -33,87 +33,44 @@ import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.implementation.bind.annotation.SuperCall;
 import net.bytebuddy.pool.TypePool;
+import org.apache.cassandra.utils.Shared;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
-import org.apache.cassandra.utils.Shared;
 
 import static net.bytebuddy.matcher.ElementMatchers.named;
 
-public class NodeMovementTest extends NodeMovementBaseTest
+public class NodeMovementTestMultiDC extends NodeMovementBaseTest
 {
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void moveNodeDuringBulkWriteTest(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+
+    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void moveNodeMultiDCTest(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
-        BBHelperMovingNode.reset();
+        BBHelperMovingNodeMultiDC.reset();
         runMovingNodeTest(cassandraTestContext,
-                          BBHelperMovingNode::install,
-                          BBHelperMovingNode.transientStateStart,
-                          BBHelperMovingNode.transientStateEnd,
-                          false,
-                          false);
+                                 BBHelperMovingNodeMultiDC::install,
+                                 BBHelperMovingNodeMultiDC.transientStateStart,
+                                 BBHelperMovingNodeMultiDC.transientStateEnd,
+                                 true,
+                                 false);
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void moveNodeFailedDuringBulkWriteTest(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void moveNodeFailureMultiDCTest(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
-        BBHelperMovingNodeFailure.reset();
+        BBHelperMultiDCMovingNodeFailure.reset();
         runMovingNodeTest(cassandraTestContext,
-                          BBHelperMovingNodeFailure::install,
-                          BBHelperMovingNodeFailure.transientStateStart,
-                          BBHelperMovingNodeFailure.transientStateEnd,
-                          false,
-                          true);
+                                 BBHelperMultiDCMovingNodeFailure::install,
+                                 BBHelperMultiDCMovingNodeFailure.transientStateStart,
+                                 BBHelperMultiDCMovingNodeFailure.transientStateEnd,
+                                 true,
+                                 true);
     }
-
-    /**
-     * ByteBuddy Helper for a single moving node simulating a move failure
-     */
-    @Shared
-    public static class BBHelperMovingNodeFailure
-    {
-        static CountDownLatch transientStateStart = new CountDownLatch(1);
-        static CountDownLatch transientStateEnd = new CountDownLatch(1);
-
-        public static void install(ClassLoader cl, Integer nodeNumber)
-        {
-            // Moving the 5th node in the test case
-            if (nodeNumber == SINGLE_DC_MOVING_NODE_IDX)
-            {
-                TypePool typePool = TypePool.Default.of(cl);
-                TypeDescription description = typePool.describe("org.apache.cassandra.service.RangeRelocator")
-                                                      .resolve();
-                new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
-                               .method(named("stream"))
-                               .intercept(MethodDelegation.to(BBHelperMovingNodeFailure.class))
-                               // Defer class loading until all dependencies are loaded
-                               .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
-                               .load(cl, ClassLoadingStrategy.Default.INJECTION);
-            }
-        }
-
-        @SuppressWarnings("unused")
-        public static Future<?> stream(@SuperCall Callable<Future<?>> orig) throws Exception
-        {
-            Future<?> res = orig.call();
-            transientStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
-
-            throw new IOException("Simulated node movement failures"); // Throws exception to nodetool
-        }
-
-        public static void reset()
-        {
-            transientStateStart = new CountDownLatch(1);
-            transientStateEnd = new CountDownLatch(1);
-        }
-    }
-
 
     /**
      * ByteBuddy Helper for a single moving node
      */
     @Shared
-    public static class BBHelperMovingNode
+    public static class BBHelperMovingNodeMultiDC
     {
         static CountDownLatch transientStateStart = new CountDownLatch(1);
         static CountDownLatch transientStateEnd = new CountDownLatch(1);
@@ -121,14 +78,14 @@ public class NodeMovementTest extends NodeMovementBaseTest
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
             // Moving the 5th node in the test case
-            if (nodeNumber == SINGLE_DC_MOVING_NODE_IDX)
+            if (nodeNumber == MULTI_DC_MOVING_NODE_IDX)
             {
                 TypePool typePool = TypePool.Default.of(cl);
                 TypeDescription description = typePool.describe("org.apache.cassandra.service.RangeRelocator")
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
                                .method(named("stream"))
-                               .intercept(MethodDelegation.to(BBHelperMovingNode.class))
+                               .intercept(MethodDelegation.to(BBHelperMovingNodeMultiDC.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);
@@ -142,6 +99,49 @@ public class NodeMovementTest extends NodeMovementBaseTest
             transientStateStart.countDown();
             Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return res;
+        }
+
+        public static void reset()
+        {
+            transientStateStart = new CountDownLatch(1);
+            transientStateEnd = new CountDownLatch(1);
+        }
+    }
+
+    /**
+     * ByteBuddy Helper for a single moving node
+     */
+    @Shared
+    public static class BBHelperMultiDCMovingNodeFailure
+    {
+        static CountDownLatch transientStateStart = new CountDownLatch(1);
+        static CountDownLatch transientStateEnd = new CountDownLatch(1);
+
+        public static void install(ClassLoader cl, Integer nodeNumber)
+        {
+            // Moving the 5th node in the test case
+            if (nodeNumber == MULTI_DC_MOVING_NODE_IDX)
+            {
+                TypePool typePool = TypePool.Default.of(cl);
+                TypeDescription description = typePool.describe("org.apache.cassandra.service.RangeRelocator")
+                                                      .resolve();
+                new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
+                               .method(named("stream"))
+                               .intercept(MethodDelegation.to(BBHelperMultiDCMovingNodeFailure.class))
+                               // Defer class loading until all dependencies are loaded
+                               .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
+                               .load(cl, ClassLoadingStrategy.Default.INJECTION);
+            }
+        }
+
+        @SuppressWarnings("unused")
+        public static Future<?> stream(@SuperCall Callable<Future<?>> orig) throws Exception
+        {
+            Future<?> res = orig.call();
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+
+            throw new IOException("Simulated node movement failure"); // Throws exception to nodetool
         }
 
         public static void reset()

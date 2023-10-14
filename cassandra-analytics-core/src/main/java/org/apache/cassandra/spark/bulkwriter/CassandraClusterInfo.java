@@ -441,7 +441,6 @@ public class CassandraClusterInfo implements ClusterInfo, Closeable
                                            .map(RingInstance::new)
                                            .collect(Collectors.toSet());
 
-            // TODO: By DC for instances to be added to "failed" set during CL checks
             blockedInstances = response.replicaMetadata().stream()
                                        .map(RingInstance::new)
                                        .filter(this::instanceIsBlocked)

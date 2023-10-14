@@ -19,6 +19,7 @@
 package org.apache.cassandra.analytics.movement;
 
 import java.io.IOException;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
@@ -37,13 +38,18 @@ import org.apache.cassandra.distributed.shared.ClusterUtils;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 public class NodeMovementBaseTest extends ResiliencyTestBase
 {
-    public static final int MOVING_NODE_IDX = 5;
+    public static final int SINGLE_DC_MOVING_NODE_IDX = 5;
+    public static final int MULTI_DC_MOVING_NODE_IDX = 3;
+
     void runMovingNodeTest(ConfigurableCassandraTestContext cassandraTestContext,
                            BiConsumer<ClassLoader, Integer> instanceInitializer,
                            CountDownLatch transientStateStart,
                            CountDownLatch transientStateEnd,
+                           boolean isCrossDCKeyspace,
                            boolean isFailure) throws IOException
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
@@ -51,16 +57,27 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
                                                                                 annotation.newNodesPerDc(),
                                                                                 annotation.numDcs(),
                                                                                 1);
-
-        UpgradeableCluster cluster = cassandraTestContext.configureAndStartCluster(builder -> {
-            builder.withInstanceInitializer(instanceInitializer);
-            builder.withTokenSupplier(tokenSupplier);
-        });
-
+        UpgradeableCluster cluster;
         QualifiedTableName schema;
+        int movingNodeIndex;
+        if (annotation.numDcs() > 1)
+        {
+            movingNodeIndex = MULTI_DC_MOVING_NODE_IDX;
+            cluster = getMultiDCCluster(instanceInitializer, cassandraTestContext);
+        }
+        else
+        {
+            movingNodeIndex = SINGLE_DC_MOVING_NODE_IDX;
+            cluster = cassandraTestContext.configureAndStartCluster(builder -> {
+                builder.withInstanceInitializer(instanceInitializer);
+                builder.withTokenSupplier(tokenSupplier);
+            });
+        }
+
+
         long moveTarget = getMoveTargetToken(cluster);
-        int movingNodeIndex = MOVING_NODE_IDX;
         IUpgradeableInstance movingNode = cluster.get(movingNodeIndex);
+        String initialToken = movingNode.config().getString("initial_token");
 
         try
         {
@@ -72,8 +89,7 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
             // Wait until nodes have reached expected state
             Uninterruptibles.awaitUninterruptibly(transientStateStart, 2, TimeUnit.MINUTES);
             ClusterUtils.awaitRingState(seed, movingNode, "Moving");
-
-            schema = bulkWriteData();
+            schema = bulkWriteData(isCrossDCKeyspace);
         }
         finally
         {
@@ -89,8 +105,16 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
 
         if (isFailure)
         {
-            ClusterUtils.awaitRingState(cluster.get(1), movingNode, "Moving");
+            Optional<ClusterUtils.RingInstanceDetails> movingInstance =
+            ClusterUtils.ring(cluster.get(1))
+                        .stream()
+                        .filter(i -> i.getAddress().equals(movingNode.broadcastAddress().getAddress().getHostAddress()))
+                        .findFirst();
+            assertThat(movingInstance.isPresent()).isTrue();
+            String state = movingInstance.get().getState();
 
+            assertThat(state.equals("Moving") ||
+                       (state.equals("Normal") && movingInstance.get().getToken().equals(initialToken))).isTrue();
         }
     }
 
@@ -107,5 +131,4 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
         long t3 = Long.parseLong(cluster.get(nextIndex).config().getString("initial_token"));
         return (t2 + ((t3 - t2) / 2));
     }
-
 }

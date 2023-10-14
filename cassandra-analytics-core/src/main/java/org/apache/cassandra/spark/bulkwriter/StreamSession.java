@@ -161,7 +161,6 @@ public class StreamSession
     List<RingInstance> getReplicas()
     {
         List<RingInstance> exclusions = failureHandler.getFailedInstances();
-        // TODO: Why is subRanges causing issues?
         final Map<Range<BigInteger>, List<RingInstance>> overlappingRanges = tokenRangeMapping.getSubRanges(tokenRange).asMapOfRanges();
 
         LOGGER.debug("[{}]: Stream session token range: {} overlaps with ring ranges: {}", sessionID, tokenRange, overlappingRanges);

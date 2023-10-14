@@ -182,31 +182,62 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         });
     }
 
-    protected QualifiedTableName bulkWriteData()
+    protected QualifiedTableName bulkWriteData(boolean isCrossDCKeyspace)
     {
-        ImmutableMap<String, Integer> rf = ImmutableMap.of("datacenter1", 3);
+        CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
+        List<String> sidecarInstances = generateSidecarInstances((annotation.nodesPerDc() + annotation.newNodesPerDc()) * annotation.numDcs());
+
+        ImmutableMap<String, Integer> rf;
+        if (annotation.numDcs() > 1 && isCrossDCKeyspace)
+        {
+            rf = ImmutableMap.of("datacenter1", DEFAULT_RF, "datacenter2", DEFAULT_RF);
+        }
+        else
+        {
+            rf = ImmutableMap.of("datacenter1", DEFAULT_RF);
+        }
+
         QualifiedTableName schema = initializeSchema(rf);
 
         SparkConf sparkConf = generateSparkConf();
         SparkSession spark = generateSparkSession(sparkConf);
         Dataset<org.apache.spark.sql.Row> df = generateData(spark);
 
-        LOGGER.info("Spark Conf: " + sparkConf.toDebugString());
-
-        // A constant timestamp and TTL can be used by setting the following options.
-        // .option(WriterOptions.TTL.name(), TTLOption.constant(20))
-        // .option(WriterOptions.TIMESTAMP.name(), TimestampOption.constant(System.currentTimeMillis() * 1000))
         DataFrameWriter<org.apache.spark.sql.Row> dfWriter = df.write()
                                                                .format("org.apache.cassandra.spark.sparksql.CassandraDataSink")
-                                                               .option("sidecar_instances", "localhost,localhost2,localhost3")
+                                                               .option("sidecar_instances", String.join(",", sidecarInstances))
                                                                .option("sidecar_port", String.valueOf(server.actualPort()))
                                                                .option("keyspace", schema.keyspace())
                                                                .option("table", schema.tableName())
-                                                               .option("local_dc", "datacenter1")
-                                                               .option("bulk_writer_cl", "LOCAL_QUORUM")
                                                                .option("number_splits", "-1")
                                                                .mode("append");
+        if (isCrossDCKeyspace)
+        {
+            dfWriter.option("bulk_writer_cl", "QUORUM");
+        }
+        else
+        {
+            dfWriter.option("local_dc", "datacenter1")
+                    .option("bulk_writer_cl", "LOCAL_QUORUM");
+        }
+
         dfWriter.save();
         return schema;
+    }
+
+    protected QualifiedTableName bulkWriteData()
+    {
+        return bulkWriteData(false);
+    }
+
+    List<String> generateSidecarInstances(int numNodes)
+    {
+        List<String> sidecarInstances = new ArrayList<>();
+        sidecarInstances.add("localhost");
+        for (int i = 2; i <= numNodes; i++)
+        {
+            sidecarInstances.add("localhost" + i);
+        }
+        return sidecarInstances;
     }
 }

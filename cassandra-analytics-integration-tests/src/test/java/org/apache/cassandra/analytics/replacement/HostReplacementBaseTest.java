@@ -46,16 +46,37 @@ import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class HostReplacementBaseTest extends ResiliencyTestBase
 {
 
     void runReplacementTest(ConfigurableCassandraTestContext cassandraTestContext,
-                                          BiConsumer<ClassLoader, Integer> instanceInitializer,
-                                          CountDownLatch transientStateStart,
-                                          CountDownLatch transientStateEnd,
-                                          CountDownLatch nodeStart,
-                                          boolean isFailure) throws IOException
+                            BiConsumer<ClassLoader, Integer> instanceInitializer,
+                            CountDownLatch transientStateStart,
+                            CountDownLatch transientStateEnd,
+                            CountDownLatch nodeStart,
+                            boolean isCrossDCKeyspace,
+                            boolean isFailure) throws IOException
+    {
+        runReplacementTest(cassandraTestContext,
+                           instanceInitializer,
+                           transientStateStart,
+                           transientStateEnd,
+                           nodeStart,
+                           isCrossDCKeyspace,
+                           isFailure,
+                           false);
+    }
+
+    void runReplacementTest(ConfigurableCassandraTestContext cassandraTestContext,
+                            BiConsumer<ClassLoader, Integer> instanceInitializer,
+                            CountDownLatch transientStateStart,
+                            CountDownLatch transientStateEnd,
+                            CountDownLatch nodeStart,
+                            boolean isCrossDCKeyspace,
+                            boolean isFailure,
+                            boolean shouldWriteFail) throws IOException
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         TokenSupplier tokenSupplier = TestTokenSupplier.evenlyDistributedTokens(annotation.nodesPerDc(),
@@ -105,7 +126,14 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                 assertThat(replacementInstance).isPresent();
                 // Verify that replacement node tokens match the removed nodes
                 assertThat(removedNodeTokens).contains(replacementInstance.get().getToken());
-                schema = bulkWriteData();
+                if (shouldWriteFail)
+                {
+                    assertThrows(RuntimeException.class, () -> bulkWriteData(isCrossDCKeyspace));
+                }
+                else
+                {
+                    schema = bulkWriteData(isCrossDCKeyspace);
+                }
             }
         }
         finally
@@ -116,26 +144,33 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
             }
         }
 
-        ClusterUtils.awaitRingState(cluster.get(1), newNodes.get(0), "Normal");
-        Session session = maybeGetSession();
-        validateData(session, schema.tableName(), ConsistencyLevel.QUORUM);
-
-        if (isFailure)
+        if (!shouldWriteFail)
         {
-            Optional<ClusterUtils.RingInstanceDetails> replacementNode =
-            getMatchingInstanceFromRing(cluster.get(1), newNodes.get(0).broadcastAddress().getAddress().getHostAddress());
-            // Validate that the replacement node did not succeed in joining (if still visible in ring)
-            if (replacementNode.isPresent())
+            if (!isFailure)
             {
-                assertThat(replacementNode.get().getState()).isNotEqualTo("Normal");
+                ClusterUtils.awaitRingState(cluster.get(1), newNodes.get(0), "Normal");
             }
 
-            Optional<ClusterUtils.RingInstanceDetails> removedNode =
-            getMatchingInstanceFromRing(cluster.get(1), removedNodeAddresses.get(0));
-            // Validate that the removed node is "Down" (if still visible in ring)
-            if (removedNode.isPresent())
+            Session session = maybeGetSession();
+            validateData(session, schema.tableName(), ConsistencyLevel.QUORUM);
+
+            if (isFailure)
             {
-                assertThat(removedNode.get().getStatus()).isEqualTo("Down");
+                Optional<ClusterUtils.RingInstanceDetails> replacementNode =
+                getMatchingInstanceFromRing(cluster.get(1), newNodes.get(0).broadcastAddress().getAddress().getHostAddress());
+                // Validate that the replacement node did not succeed in joining (if still visible in ring)
+                if (replacementNode.isPresent())
+                {
+                    assertThat(replacementNode.get().getState()).isNotEqualTo("Normal");
+                }
+
+                Optional<ClusterUtils.RingInstanceDetails> removedNode =
+                getMatchingInstanceFromRing(cluster.get(1), removedNodeAddresses.get(0));
+                // Validate that the removed node is "Down" (if still visible in ring)
+                if (removedNode.isPresent())
+                {
+                    assertThat(removedNode.get().getStatus()).isEqualTo("Down");
+                }
             }
         }
     }

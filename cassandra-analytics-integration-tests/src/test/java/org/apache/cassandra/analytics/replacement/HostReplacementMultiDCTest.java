@@ -39,27 +39,57 @@ import org.apache.cassandra.utils.Shared;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
-public class HostReplacementTest extends HostReplacementBaseTest
+public class HostReplacementMultiDCTest extends HostReplacementBaseTest
 {
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementDuringBulkWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void nodeReplacementMultiDCTest(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
-        BBHelperReplacementsNode.reset();
+        BBHelperNodeReplacementMultiDC.reset();
+
         runReplacementTest(cassandraTestContext,
-                           BBHelperReplacementsNode::install,
-                           BBHelperReplacementsNode.transientStateStart,
-                           BBHelperReplacementsNode.transientStateEnd,
-                           BBHelperReplacementsNode.nodeStart,
-                           false,
+                           BBHelperNodeReplacementMultiDC::install,
+                           BBHelperNodeReplacementMultiDC.transientStateStart,
+                           BBHelperNodeReplacementMultiDC.transientStateEnd,
+                           BBHelperNodeReplacementMultiDC.nodeStart,
+                           true,
                            false);
     }
 
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    void nodeReplacementFailureMultiDC(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperReplacementFailureMultiDC.reset();
+
+        runReplacementTest(cassandraTestContext,
+                           BBHelperReplacementFailureMultiDC::install,
+                           BBHelperReplacementFailureMultiDC.transientStateStart,
+                           BBHelperReplacementFailureMultiDC.transientStateEnd,
+                           BBHelperReplacementFailureMultiDC.nodeStart,
+                           true,
+                           true);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    void nodeReplacementFailureMultiDCInsufficientNodes(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperNodeReplacementMultiDCInsufficientReplicas.reset();
+
+        runReplacementTest(cassandraTestContext,
+                           BBHelperNodeReplacementMultiDCInsufficientReplicas::install,
+                           BBHelperNodeReplacementMultiDCInsufficientReplicas.transientStateStart,
+                           BBHelperNodeReplacementMultiDCInsufficientReplicas.transientStateEnd,
+                           BBHelperNodeReplacementMultiDCInsufficientReplicas.nodeStart,
+                           true,
+                           true,
+                           true);
+    }
+
     /**
-     * ByteBuddy helper for a single node replacement
+     * ByteBuddy helper for a multi DC node replacement that succeeds
      */
     @Shared
-    public static class BBHelperReplacementsNode
+    public static class BBHelperNodeReplacementMultiDC
     {
         // Additional latch used here to sequentially start the 2 new nodes to isolate the loading
         // of the shared Cassandra system property REPLACE_ADDRESS_FIRST_BOOT across instances
@@ -78,7 +108,7 @@ public class HostReplacementTest extends HostReplacementBaseTest
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
                                .method(named("bootstrap").and(takesArguments(2)))
-                               .intercept(MethodDelegation.to(BBHelperReplacementsNode.class))
+                               .intercept(MethodDelegation.to(BBHelperNodeReplacementMultiDC.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);
@@ -105,24 +135,63 @@ public class HostReplacementTest extends HostReplacementBaseTest
         }
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementFailureDuringBulkWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    /**
+     * ByteBuddy helper for multi DC node replacement failure resulting in insufficient nodes
+     */
+    @Shared
+    public static class BBHelperNodeReplacementMultiDCInsufficientReplicas
     {
-        BBHelperReplacementsNodeFailure.reset();
-        runReplacementTest(cassandraTestContext,
-                           BBHelperReplacementsNodeFailure::install,
-                           BBHelperReplacementsNodeFailure.transientStateStart,
-                           BBHelperReplacementsNodeFailure.transientStateEnd,
-                           BBHelperReplacementsNodeFailure.nodeStart,
-                           false,
-                           true);
+        // Additional latch used here to sequentially start the 2 new nodes to isolate the loading
+        // of the shared Cassandra system property REPLACE_ADDRESS_FIRST_BOOT across instances
+        static CountDownLatch nodeStart = new CountDownLatch(1);
+        static CountDownLatch transientStateStart = new CountDownLatch(1);
+        static CountDownLatch transientStateEnd = new CountDownLatch(1);
+
+        public static void install(ClassLoader cl, Integer nodeNumber)
+        {
+            // Test case involves 5 node cluster with a replacement node
+            // We intercept the bootstrap of the replacement (6th) node to validate token ranges
+            if (nodeNumber == 4)
+            {
+                TypePool typePool = TypePool.Default.of(cl);
+                TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
+                                                      .resolve();
+                new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
+                               .method(named("bootstrap").and(takesArguments(2)))
+                               .intercept(MethodDelegation.to(HostReplacementMultiDCTest.BBHelperNodeReplacementMultiDCInsufficientReplicas.class))
+                               // Defer class loading until all dependencies are loaded
+                               .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
+                               .load(cl, ClassLoadingStrategy.Default.INJECTION);
+            }
+        }
+
+
+        public static boolean bootstrap(Collection<?> tokens,
+                                        long bootstrapTimeoutMillis,
+                                        @SuperCall Callable<Boolean> orig) throws Exception
+        {
+            boolean result = orig.call();
+            nodeStart.countDown();
+            // trigger bootstrap start and wait until bootstrap is ready from test
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            throw new UnsupportedOperationException("Simulated failure");
+            // return result;
+        }
+
+        public static void reset()
+        {
+            nodeStart = new CountDownLatch(1);
+            transientStateStart = new CountDownLatch(1);
+            transientStateEnd = new CountDownLatch(1);
+        }
     }
 
     /**
-     * ByteBuddy helper for a single node replacement
+     * ByteBuddy helper for multi DC node replacement failure
      */
     @Shared
-    public static class BBHelperReplacementsNodeFailure
+    public static class BBHelperReplacementFailureMultiDC
     {
         // Additional latch used here to sequentially start the 2 new nodes to isolate the loading
         // of the shared Cassandra system property REPLACE_ADDRESS_FIRST_BOOT across instances
@@ -141,7 +210,7 @@ public class HostReplacementTest extends HostReplacementBaseTest
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
                                .method(named("bootstrap").and(takesArguments(2)))
-                               .intercept(MethodDelegation.to(BBHelperReplacementsNodeFailure.class))
+                               .intercept(MethodDelegation.to(BBHelperReplacementFailureMultiDC.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);

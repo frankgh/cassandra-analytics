@@ -89,7 +89,7 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
             // Wait until nodes have reached expected state
             Uninterruptibles.awaitUninterruptibly(transientStateStart, 2, TimeUnit.MINUTES);
             ClusterUtils.awaitRingState(seed, movingNode, "Moving");
-            schema = bulkWriteData(isCrossDCKeyspace);
+            schema = bulkWriteData(isCrossDCKeyspace, ConsistencyLevel.QUORUM);
         }
         finally
         {

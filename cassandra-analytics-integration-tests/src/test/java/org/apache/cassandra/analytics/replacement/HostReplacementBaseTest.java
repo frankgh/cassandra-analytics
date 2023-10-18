@@ -128,11 +128,11 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                 assertThat(removedNodeTokens).contains(replacementInstance.get().getToken());
                 if (shouldWriteFail)
                 {
-                    assertThrows(RuntimeException.class, () -> bulkWriteData(isCrossDCKeyspace));
+                    assertThrows(RuntimeException.class, () -> bulkWriteData(isCrossDCKeyspace, ConsistencyLevel.QUORUM));
                 }
                 else
                 {
-                    schema = bulkWriteData(isCrossDCKeyspace);
+                    schema = bulkWriteData(isCrossDCKeyspace, ConsistencyLevel.QUORUM);
                 }
             }
         }

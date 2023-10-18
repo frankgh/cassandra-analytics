@@ -73,16 +73,7 @@ class LeavingBaseTest extends ResiliencyTestBase
                 ClusterUtils.awaitRingState(seed, node, "Leaving");
             }
 
-            if (annotation.numDcs() > 1)
-            {
-                List<String> sidecarInstances = generateSidecarInstances(annotation.nodesPerDc() * annotation.numDcs());
-                table = bulkWriteData(ImmutableMap.of("datacenter1", 3, "datacenter2", 3), true, sidecarInstances, writeCL.name());
-            }
-            else
-            {
-                List<String> sidecarInstances = generateSidecarInstances(annotation.nodesPerDc());
-                table = bulkWriteData(ImmutableMap.of("datacenter1", 3), false, sidecarInstances, writeCL.name());
-            }
+            table = bulkWriteData(annotation.numDcs() > 1, writeCL);
 
             // fail the leave
         }
@@ -96,47 +87,5 @@ class LeavingBaseTest extends ResiliencyTestBase
             assertNotNull(table);
             validateData(session, table.tableName(), readCL);
         }
-    }
-
-    List<String> generateSidecarInstances(int numNodes)
-    {
-        List<String> sidecarInstances = new ArrayList<>();
-        sidecarInstances.add("localhost");
-        for (int i = 2; i <= numNodes; i++)
-        {
-            sidecarInstances.add("localhost" + i);
-        }
-        return sidecarInstances;
-    }
-
-    private QualifiedTableName bulkWriteData(ImmutableMap<String, Integer> rf,
-                                             boolean isCrossDCKeyspace,
-                                             List<String> sidecarInstances,
-                                             String writeCL)
-    {
-        QualifiedTableName schema = initializeSchema(rf);
-
-        SparkConf sparkConf = generateSparkConf();
-        SparkSession spark = generateSparkSession(sparkConf);
-        Dataset<Row> df = generateData(spark);
-
-        DataFrameWriter<Row> dfWriter = df.write()
-                                          .format("org.apache.cassandra.spark.sparksql.CassandraDataSink")
-                                          .option("bulk_writer_cl", writeCL)
-                                          .option("sidecar_instances", String.join(",", sidecarInstances))
-                                          .option("sidecar_port", String.valueOf(server.actualPort()))
-                                          .option("keyspace", schema.keyspace())
-                                          .option("table", schema.tableName())
-                                          .option("number_splits", "-1")
-                                          .mode("append");
-
-        if (!isCrossDCKeyspace)
-        {
-            dfWriter.option("local_dc", "datacenter1");
-
-        }
-
-        dfWriter.save();
-        return schema;
     }
 }

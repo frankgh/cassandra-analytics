@@ -182,7 +182,7 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         });
     }
 
-    protected QualifiedTableName bulkWriteData(boolean isCrossDCKeyspace)
+    protected QualifiedTableName bulkWriteData(boolean isCrossDCKeyspace, ConsistencyLevel writeCL)
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         List<String> sidecarInstances = generateSidecarInstances((annotation.nodesPerDc() + annotation.newNodesPerDc()) * annotation.numDcs());
@@ -205,29 +205,25 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
 
         DataFrameWriter<org.apache.spark.sql.Row> dfWriter = df.write()
                                                                .format("org.apache.cassandra.spark.sparksql.CassandraDataSink")
+                                                               .option("bulk_writer_cl", writeCL.name())
                                                                .option("sidecar_instances", String.join(",", sidecarInstances))
                                                                .option("sidecar_port", String.valueOf(server.actualPort()))
                                                                .option("keyspace", schema.keyspace())
                                                                .option("table", schema.tableName())
                                                                .option("number_splits", "-1")
                                                                .mode("append");
-        if (isCrossDCKeyspace)
+        if (!isCrossDCKeyspace)
         {
-            dfWriter.option("bulk_writer_cl", "QUORUM");
-        }
-        else
-        {
-            dfWriter.option("local_dc", "datacenter1")
-                    .option("bulk_writer_cl", "LOCAL_QUORUM");
+            dfWriter.option("local_dc", "datacenter1");
         }
 
         dfWriter.save();
         return schema;
     }
 
-    protected QualifiedTableName bulkWriteData()
+    protected QualifiedTableName bulkWriteData(ConsistencyLevel writeCL)
     {
-        return bulkWriteData(false);
+        return bulkWriteData(false, writeCL);
     }
 
     List<String> generateSidecarInstances(int numNodes)

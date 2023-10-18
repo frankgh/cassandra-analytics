@@ -91,16 +91,8 @@ public class JoiningBaseTest extends ResiliencyTestBase
                 ClusterUtils.awaitRingState(seed, newInstance, "Joining");
             }
 
-            if (annotation.numDcs() > 1 && isCrossDCKeyspace)
-            {
-                List<String> sidecarInstances = generateSidecarInstances((annotation.nodesPerDc() + annotation.newNodesPerDc()) * annotation.numDcs());
-                table = bulkWriteData(ImmutableMap.of("datacenter1", DEFAULT_RF, "datacenter2", DEFAULT_RF), true, sidecarInstances, writeCL.name());
-            }
-            else
-            {
-                List<String> sidecarInstances = generateSidecarInstances(annotation.nodesPerDc() + annotation.newNodesPerDc());
-                table = bulkWriteData(ImmutableMap.of("datacenter1", DEFAULT_RF), false, sidecarInstances, writeCL.name());
-            }
+            table = bulkWriteData(isCrossDCKeyspace, writeCL);
+
             Session session = maybeGetSession();
             assertNotNull(table);
             validateData(session, table.tableName(), readCL);
@@ -140,46 +132,5 @@ public class JoiningBaseTest extends ResiliencyTestBase
                                true,
                                readCL,
                                writeCL);
-    }
-
-    List<String> generateSidecarInstances(int numNodes)
-    {
-        List<String> sidecarInstances = new ArrayList<>();
-        sidecarInstances.add("localhost");
-        for (int i = 2; i <= numNodes; i++)
-        {
-            sidecarInstances.add("localhost" + i);
-        }
-        return sidecarInstances;
-    }
-
-    QualifiedTableName bulkWriteData(ImmutableMap<String, Integer> rf,
-                                     boolean isCrossDCKeyspace,
-                                     List<String> sidecarInstances,
-                                     String writeCL)
-    {
-        QualifiedTableName schema = initializeSchema(rf);
-
-        SparkConf sparkConf = generateSparkConf();
-        SparkSession spark = generateSparkSession(sparkConf);
-        Dataset<Row> df = generateData(spark);
-
-        DataFrameWriter<Row> dfWriter = df.write()
-                                          .format("org.apache.cassandra.spark.sparksql.CassandraDataSink")
-                                          .option("bulk_write_cl", writeCL)
-                                          .option("sidecar_instances", String.join(",", sidecarInstances))
-                                          .option("sidecar_port", String.valueOf(server.actualPort()))
-                                          .option("keyspace", schema.keyspace())
-                                          .option("table", schema.tableName())
-                                          .option("number_splits", "-1")
-                                          .mode("append");
-
-        if (!isCrossDCKeyspace)
-        {
-            dfWriter.option("local_dc", "datacenter1");
-        }
-
-        dfWriter.save();
-        return schema;
     }
 }

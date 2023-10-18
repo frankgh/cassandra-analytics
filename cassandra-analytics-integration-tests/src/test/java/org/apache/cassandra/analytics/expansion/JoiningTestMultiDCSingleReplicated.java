@@ -25,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import com.google.common.util.concurrent.Uninterruptibles;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import com.datastax.driver.core.ConsistencyLevel;
 import io.vertx.junit5.VertxExtension;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
@@ -46,7 +47,7 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 public class JoiningTestMultiDCSingleReplicated extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void validateBulkWrittenData(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void multiDCSingleJoiningNodeAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMultiDC.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext);
@@ -54,7 +55,51 @@ public class JoiningTestMultiDCSingleReplicated extends JoiningBaseTest
         runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
                                BBHelperMultiDC.transientStateEnd,
                                cluster,
-                               false);
+                               false,
+                               ConsistencyLevel.ALL,
+                               ConsistencyLevel.ONE);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void multiDCSingleJoiningNodeFailureAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperMultiDC.reset();
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDCFailure::install, cassandraTestContext);
+
+        runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
+                               BBHelperMultiDC.transientStateEnd,
+                               cluster,
+                               false,
+                               ConsistencyLevel.ALL,
+                               ConsistencyLevel.ONE);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void multiDCSingleJoiningNodeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperMultiDC.reset();
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext);
+
+        runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
+                               BBHelperMultiDC.transientStateEnd,
+                               cluster,
+                               false,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void multiDCSingleJoiningNodeFailureQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperMultiDC.reset();
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDCFailure::install, cassandraTestContext);
+
+        runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
+                               BBHelperMultiDC.transientStateEnd,
+                               cluster,
+                               false,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM);
     }
 
     /**
@@ -93,6 +138,51 @@ public class JoiningTestMultiDCSingleReplicated extends JoiningBaseTest
             transientStateStart.countDown();
             Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return result;
+        }
+
+        public static void reset()
+        {
+            transientStateStart = new CountDownLatch(2);
+            transientStateEnd = new CountDownLatch(2);
+        }
+    }
+
+    /**
+     * ByteBuddy helper for multiple joining nodes failure
+     */
+    @Shared
+    public static class BBHelperMultiDCFailure
+    {
+        static CountDownLatch transientStateStart = new CountDownLatch(2);
+        static CountDownLatch transientStateEnd = new CountDownLatch(2);
+
+        public static void install(ClassLoader cl, Integer nodeNumber)
+        {
+            // Test case involves adding 2 nodes to a 10 node cluster (5 per DC)
+            // We intercept the bootstrap of nodes (11,12) to validate token ranges
+            if (nodeNumber > 10)
+            {
+                TypePool typePool = TypePool.Default.of(cl);
+                TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
+                                                      .resolve();
+                new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
+                               .method(named("bootstrap").and(takesArguments(2)))
+                               .intercept(MethodDelegation.to(BBHelperMultiDC.class))
+                               // Defer class loading until all dependencies are loaded
+                               .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
+                               .load(cl, ClassLoadingStrategy.Default.INJECTION);
+            }
+        }
+
+        public static boolean bootstrap(Collection<?> tokens,
+                                        long bootstrapTimeoutMillis,
+                                        @SuperCall Callable<Boolean> orig) throws Exception
+        {
+            boolean result = orig.call();
+            // trigger bootstrap start and wait until bootstrap is ready from test
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            throw new UnsupportedOperationException("Simulated failure");
         }
 
         public static void reset()

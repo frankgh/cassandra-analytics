@@ -25,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import com.google.common.util.concurrent.Uninterruptibles;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import com.datastax.driver.core.ConsistencyLevel;
 import io.vertx.junit5.VertxExtension;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
@@ -45,13 +46,39 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 public class JoiningTestSingleNode extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void validateBulkWrittenData(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void singleJoinNodeOneReadALLWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleJoiningNode.reset();
         runJoiningTestScenario(cassandraTestContext,
                                BBHelperSingleJoiningNode::install,
                                BBHelperSingleJoiningNode.transientStateStart,
-                               BBHelperSingleJoiningNode.transientStateEnd);
+                               BBHelperSingleJoiningNode.transientStateEnd,
+                               ConsistencyLevel.ONE,
+                               ConsistencyLevel.ALL);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    void singleJoinNodeFailureOneReadALLWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperSingleJoiningNodeFailure.reset();
+        runJoiningTestScenario(cassandraTestContext,
+                               BBHelperSingleJoiningNode::install,
+                               BBHelperSingleJoiningNode.transientStateStart,
+                               BBHelperSingleJoiningNode.transientStateEnd,
+                               ConsistencyLevel.ONE,
+                               ConsistencyLevel.ALL);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    void singleJoinNodeFailureQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperSingleJoiningNodeFailure.reset();
+        runJoiningTestScenario(cassandraTestContext,
+                               BBHelperSingleJoiningNode::install,
+                               BBHelperSingleJoiningNode.transientStateStart,
+                               BBHelperSingleJoiningNode.transientStateEnd,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM);
     }
 
     /**
@@ -90,6 +117,51 @@ public class JoiningTestSingleNode extends JoiningBaseTest
             transientStateStart.countDown();
             Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return result;
+        }
+
+        public static void reset()
+        {
+            transientStateStart = new CountDownLatch(1);
+            transientStateEnd = new CountDownLatch(1);
+        }
+    }
+
+    /**
+     * ByteBuddy helper for a single joining node failure case
+     */
+    @Shared
+    public static class BBHelperSingleJoiningNodeFailure
+    {
+        static CountDownLatch transientStateStart = new CountDownLatch(1);
+        static CountDownLatch transientStateEnd = new CountDownLatch(1);
+
+        public static void install(ClassLoader cl, Integer nodeNumber)
+        {
+            // Test case involves 3 node cluster with 1 joining node
+            // We intercept the bootstrap of the leaving node (4) to validate token ranges
+            if (nodeNumber == 4)
+            {
+                TypePool typePool = TypePool.Default.of(cl);
+                TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
+                                                      .resolve();
+                new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
+                               .method(named("bootstrap").and(takesArguments(2)))
+                               .intercept(MethodDelegation.to(BBHelperSingleJoiningNode.class))
+                               // Defer class loading until all dependencies are loaded
+                               .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
+                               .load(cl, ClassLoadingStrategy.Default.INJECTION);
+            }
+        }
+
+        public static boolean bootstrap(Collection<?> tokens,
+                                        long bootstrapTimeoutMillis,
+                                        @SuperCall Callable<Boolean> orig) throws Exception
+        {
+            boolean result = orig.call();
+            // trigger bootstrap start and wait until bootstrap is ready from test
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            throw new UnsupportedOperationException("Simulated failure");
         }
 
         public static void reset()

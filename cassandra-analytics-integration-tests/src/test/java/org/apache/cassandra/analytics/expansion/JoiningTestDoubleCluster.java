@@ -25,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import com.google.common.util.concurrent.Uninterruptibles;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import com.datastax.driver.core.ConsistencyLevel;
 import io.vertx.junit5.VertxExtension;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
@@ -45,13 +46,51 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 public class JoiningTestDoubleCluster extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void validateBulkWrittenDataDoubleClusterSize(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void singleDCDoubleClusterOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperDoubleClusterSize.reset();
         runJoiningTestScenario(cassandraTestContext,
                                BBHelperDoubleClusterSize::install,
                                BBHelperDoubleClusterSize.transientStateStart,
-                               BBHelperDoubleClusterSize.transientStateEnd);
+                               BBHelperDoubleClusterSize.transientStateEnd,
+                               ConsistencyLevel.ONE,
+                               ConsistencyLevel.ALL);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    void singleDCDoubleClusterFailureOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperDoubleClusterSizeFailure.reset();
+        runJoiningTestScenario(cassandraTestContext,
+                               BBHelperDoubleClusterSize::install,
+                               BBHelperDoubleClusterSize.transientStateStart,
+                               BBHelperDoubleClusterSize.transientStateEnd,
+                               ConsistencyLevel.ONE,
+                               ConsistencyLevel.ALL);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    void singleDCDoubleClusterQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperDoubleClusterSize.reset();
+        runJoiningTestScenario(cassandraTestContext,
+                               BBHelperDoubleClusterSize::install,
+                               BBHelperDoubleClusterSize.transientStateStart,
+                               BBHelperDoubleClusterSize.transientStateEnd,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    void singleDCDoubleClusterFailureQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperDoubleClusterSizeFailure.reset();
+        runJoiningTestScenario(cassandraTestContext,
+                               BBHelperDoubleClusterSize::install,
+                               BBHelperDoubleClusterSize.transientStateStart,
+                               BBHelperDoubleClusterSize.transientStateEnd,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM);
     }
 
     /**
@@ -90,6 +129,51 @@ public class JoiningTestDoubleCluster extends JoiningBaseTest
             transientStateStart.countDown();
             Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return result;
+        }
+
+        public static void reset()
+        {
+            transientStateStart = new CountDownLatch(5);
+            transientStateEnd = new CountDownLatch(5);
+        }
+    }
+
+    /**
+     * ByteBuddy helper for doubling cluster size failure scenario
+     */
+    @Shared
+    public static class BBHelperDoubleClusterSizeFailure
+    {
+        static CountDownLatch transientStateStart = new CountDownLatch(5);
+        static CountDownLatch transientStateEnd = new CountDownLatch(5);
+
+        public static void install(ClassLoader cl, Integer nodeNumber)
+        {
+            // Test case involves 5 node cluster doubling in size
+            // We intercept the bootstrap of the new nodes (6-10) to validate token ranges
+            if (nodeNumber > 5)
+            {
+                TypePool typePool = TypePool.Default.of(cl);
+                TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
+                                                      .resolve();
+                new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
+                               .method(named("bootstrap").and(takesArguments(2)))
+                               .intercept(MethodDelegation.to(BBHelperDoubleClusterSize.class))
+                               // Defer class loading until all dependencies are loaded
+                               .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
+                               .load(cl, ClassLoadingStrategy.Default.INJECTION);
+            }
+        }
+
+        public static boolean bootstrap(Collection<?> tokens,
+                                        long bootstrapTimeoutMillis,
+                                        @SuperCall Callable<Boolean> orig) throws Exception
+        {
+            boolean result = orig.call();
+            // trigger bootstrap start and wait until bootstrap is ready from test
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            throw new UnsupportedOperationException("Simulated failure");
         }
 
         public static void reset()

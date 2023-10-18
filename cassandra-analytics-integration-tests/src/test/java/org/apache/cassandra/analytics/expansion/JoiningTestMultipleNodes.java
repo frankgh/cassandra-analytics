@@ -25,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import com.google.common.util.concurrent.Uninterruptibles;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import com.datastax.driver.core.ConsistencyLevel;
 import io.vertx.junit5.VertxExtension;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
@@ -45,14 +46,55 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 public class JoiningTestMultipleNodes extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
-    void validateBulkWrittenData(ConfigurableCassandraTestContext cassandraTestContext)
+    void multipleJoiningNodesAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext)
     throws Exception
     {
         BBHelperMultipleJoiningNodes.reset();
         runJoiningTestScenario(cassandraTestContext,
                                BBHelperMultipleJoiningNodes::install,
                                BBHelperMultipleJoiningNodes.transientStateStart,
-                               BBHelperMultipleJoiningNodes.transientStateEnd);
+                               BBHelperMultipleJoiningNodes.transientStateEnd,
+                               ConsistencyLevel.ONE,
+                               ConsistencyLevel.ALL);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
+    void multipleJoiningNodesFailureAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
+    {
+        BBHelperMultipleJoiningNodesFailure.reset();
+        runJoiningTestScenario(cassandraTestContext,
+                               BBHelperMultipleJoiningNodes::install,
+                               BBHelperMultipleJoiningNodes.transientStateStart,
+                               BBHelperMultipleJoiningNodes.transientStateEnd,
+                               ConsistencyLevel.ONE,
+                               ConsistencyLevel.ALL);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
+    void multipleJoiningNodesQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
+    {
+        BBHelperMultipleJoiningNodes.reset();
+        runJoiningTestScenario(cassandraTestContext,
+                               BBHelperMultipleJoiningNodes::install,
+                               BBHelperMultipleJoiningNodes.transientStateStart,
+                               BBHelperMultipleJoiningNodes.transientStateEnd,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
+    void multipleJoiningNodesFailureQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
+    {
+        BBHelperMultipleJoiningNodesFailure.reset();
+        runJoiningTestScenario(cassandraTestContext,
+                               BBHelperMultipleJoiningNodes::install,
+                               BBHelperMultipleJoiningNodes.transientStateStart,
+                               BBHelperMultipleJoiningNodes.transientStateEnd,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM);
     }
 
     /**
@@ -91,6 +133,51 @@ public class JoiningTestMultipleNodes extends JoiningBaseTest
             transientStateStart.countDown();
             Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return result;
+        }
+
+        public static void reset()
+        {
+            transientStateStart = new CountDownLatch(2);
+            transientStateEnd = new CountDownLatch(2);
+        }
+    }
+
+    /**
+     * ByteBuddy helper for multiple joining nodes failure scenario
+     */
+    @Shared
+    public static class BBHelperMultipleJoiningNodesFailure
+    {
+        static CountDownLatch transientStateStart = new CountDownLatch(2);
+        static CountDownLatch transientStateEnd = new CountDownLatch(2);
+
+        public static void install(ClassLoader cl, Integer nodeNumber)
+        {
+            // Test case involves 3 node cluster with a 2 joining nodes
+            // We intercept the joining of nodes (4, 5) to validate token ranges
+            if (nodeNumber > 3)
+            {
+                TypePool typePool = TypePool.Default.of(cl);
+                TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
+                                                      .resolve();
+                new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
+                               .method(named("bootstrap").and(takesArguments(2)))
+                               .intercept(MethodDelegation.to(BBHelperMultipleJoiningNodes.class))
+                               // Defer class loading until all dependencies are loaded
+                               .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
+                               .load(cl, ClassLoadingStrategy.Default.INJECTION);
+            }
+        }
+
+        public static boolean bootstrap(Collection<?> tokens,
+                                        long bootstrapTimeoutMillis,
+                                        @SuperCall Callable<Boolean> orig) throws Exception
+        {
+            boolean result = orig.call();
+            // trigger bootstrap start and wait until bootstrap is ready from test
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            throw new UnsupportedOperationException("Simulated failure");
         }
 
         public static void reset()

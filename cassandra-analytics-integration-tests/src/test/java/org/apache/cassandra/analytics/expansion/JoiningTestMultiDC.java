@@ -25,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import com.google.common.util.concurrent.Uninterruptibles;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import com.datastax.driver.core.ConsistencyLevel;
 import io.vertx.junit5.VertxExtension;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
@@ -46,7 +47,7 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 public class JoiningTestMultiDC extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void validateBulkWrittenDataDoubleClusterSizeMultiDC(ConfigurableCassandraTestContext cassandraTestContext)
+    void multiDCMultipleJoiningNodeAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext)
     throws Exception
     {
         BBHelperDoubleClusterMultiDC.reset();
@@ -55,7 +56,54 @@ public class JoiningTestMultiDC extends JoiningBaseTest
         runJoiningTestScenario(BBHelperDoubleClusterMultiDC.transientStateStart,
                                BBHelperDoubleClusterMultiDC.transientStateEnd,
                                cluster,
-                               true);
+                               true,
+                               ConsistencyLevel.ALL,
+                               ConsistencyLevel.ONE);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void multiDCMultipleJoiningNodeFailureAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
+    {
+        BBHelperDoubleClusterMultiDC.reset();
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperDoubleClusterMultiDCFailure::install, cassandraTestContext);
+
+        runJoiningTestScenario(BBHelperDoubleClusterMultiDC.transientStateStart,
+                               BBHelperDoubleClusterMultiDC.transientStateEnd,
+                               cluster,
+                               true,
+                               ConsistencyLevel.ALL,
+                               ConsistencyLevel.ONE);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void multiDCMultipleJoiningNodeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
+    {
+        BBHelperDoubleClusterMultiDC.reset();
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperDoubleClusterMultiDC::install, cassandraTestContext);
+
+        runJoiningTestScenario(BBHelperDoubleClusterMultiDC.transientStateStart,
+                               BBHelperDoubleClusterMultiDC.transientStateEnd,
+                               cluster,
+                               true,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void multiDCMultipleJoiningNodeFailureQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
+    {
+        BBHelperDoubleClusterMultiDC.reset();
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperDoubleClusterMultiDCFailure::install, cassandraTestContext);
+
+        runJoiningTestScenario(BBHelperDoubleClusterMultiDC.transientStateStart,
+                               BBHelperDoubleClusterMultiDC.transientStateEnd,
+                               cluster,
+                               true,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM);
     }
 
     /**
@@ -94,6 +142,51 @@ public class JoiningTestMultiDC extends JoiningBaseTest
             transientStateStart.countDown();
             Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             return result;
+        }
+
+        public static void reset()
+        {
+            transientStateStart = new CountDownLatch(6);
+            transientStateEnd = new CountDownLatch(6);
+        }
+    }
+
+    /**
+     * ByteBuddy helper for multiple joining nodes failure scenario in multiDC
+     */
+    @Shared
+    public static class BBHelperDoubleClusterMultiDCFailure
+    {
+        static CountDownLatch transientStateStart = new CountDownLatch(6);
+        static CountDownLatch transientStateEnd = new CountDownLatch(6);
+
+        public static void install(ClassLoader cl, Integer nodeNumber)
+        {
+            // Test case involves doubling the size of a 6 node cluster (3 per DC)
+            // We intercept the bootstrap of nodes (7-12) to validate token ranges
+            if (nodeNumber > 6)
+            {
+                TypePool typePool = TypePool.Default.of(cl);
+                TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
+                                                      .resolve();
+                new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
+                               .method(named("bootstrap").and(takesArguments(2)))
+                               .intercept(MethodDelegation.to(BBHelperDoubleClusterMultiDC.class))
+                               // Defer class loading until all dependencies are loaded
+                               .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
+                               .load(cl, ClassLoadingStrategy.Default.INJECTION);
+            }
+        }
+
+        public static boolean bootstrap(Collection<?> tokens,
+                                        long bootstrapTimeoutMillis,
+                                        @SuperCall Callable<Boolean> orig) throws Exception
+        {
+            boolean result = orig.call();
+            // trigger bootstrap start and wait until bootstrap is ready from test
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            throw new UnsupportedOperationException("Simulated failure");
         }
 
         public static void reset()

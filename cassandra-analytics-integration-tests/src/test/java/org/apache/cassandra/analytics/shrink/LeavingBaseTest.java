@@ -46,7 +46,9 @@ class LeavingBaseTest extends ResiliencyTestBase
     void runLeavingTestScenario(int leavingNodesPerDC,
                                 CountDownLatch transientStateStart,
                                 CountDownLatch transientStateEnd,
-                                UpgradeableCluster cluster)
+                                UpgradeableCluster cluster,
+                                ConsistencyLevel readCL,
+                                ConsistencyLevel writeCL)
     throws Exception
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
@@ -74,12 +76,12 @@ class LeavingBaseTest extends ResiliencyTestBase
             if (annotation.numDcs() > 1)
             {
                 List<String> sidecarInstances = generateSidecarInstances(annotation.nodesPerDc() * annotation.numDcs());
-                table = bulkWriteData(ImmutableMap.of("datacenter1", 3, "datacenter2", 3), true, sidecarInstances);
+                table = bulkWriteData(ImmutableMap.of("datacenter1", 3, "datacenter2", 3), true, sidecarInstances, writeCL.name());
             }
             else
             {
                 List<String> sidecarInstances = generateSidecarInstances(annotation.nodesPerDc());
-                table = bulkWriteData(ImmutableMap.of("datacenter1", 3), false, sidecarInstances);
+                table = bulkWriteData(ImmutableMap.of("datacenter1", 3), false, sidecarInstances, writeCL.name());
             }
 
             // fail the leave
@@ -92,7 +94,7 @@ class LeavingBaseTest extends ResiliencyTestBase
             }
             Session session = maybeGetSession();
             assertNotNull(table);
-            validateData(session, table.tableName(), ConsistencyLevel.QUORUM);
+            validateData(session, table.tableName(), readCL);
         }
     }
 
@@ -109,7 +111,8 @@ class LeavingBaseTest extends ResiliencyTestBase
 
     private QualifiedTableName bulkWriteData(ImmutableMap<String, Integer> rf,
                                              boolean isCrossDCKeyspace,
-                                             List<String> sidecarInstances)
+                                             List<String> sidecarInstances,
+                                             String writeCL)
     {
         QualifiedTableName schema = initializeSchema(rf);
 
@@ -119,6 +122,7 @@ class LeavingBaseTest extends ResiliencyTestBase
 
         DataFrameWriter<Row> dfWriter = df.write()
                                           .format("org.apache.cassandra.spark.sparksql.CassandraDataSink")
+                                          .option("bulk_writer_cl", writeCL)
                                           .option("sidecar_instances", String.join(",", sidecarInstances))
                                           .option("sidecar_port", String.valueOf(server.actualPort()))
                                           .option("keyspace", schema.keyspace())
@@ -126,14 +130,10 @@ class LeavingBaseTest extends ResiliencyTestBase
                                           .option("number_splits", "-1")
                                           .mode("append");
 
-        if (isCrossDCKeyspace)
+        if (!isCrossDCKeyspace)
         {
-            dfWriter.option("bulk_writer_cl", "QUORUM");
-        }
-        else
-        {
-            dfWriter.option("local_dc", "datacenter1")
-                    .option("bulk_writer_cl", "LOCAL_QUORUM");
+            dfWriter.option("local_dc", "datacenter1");
+
         }
 
         dfWriter.save();

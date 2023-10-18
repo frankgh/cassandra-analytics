@@ -25,6 +25,7 @@ import java.util.function.BiConsumer;
 import com.google.common.util.concurrent.Uninterruptibles;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import com.datastax.driver.core.ConsistencyLevel;
 import io.vertx.junit5.VertxExtension;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
@@ -47,43 +48,90 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 class LeavingTest extends LeavingBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void validateBulkWrittenWith1LeavingNode(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void LeavingNodeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleLeavingNode.reset();
         runLeavingTestScenario(cassandraTestContext,
                                1,
                                BBHelperSingleLeavingNode::install,
                                BBHelperSingleLeavingNode.transientStateStart,
-                               BBHelperSingleLeavingNode.transientStateEnd);
+                               BBHelperSingleLeavingNode.transientStateEnd,
+                               ConsistencyLevel.ONE,
+                               ConsistencyLevel.ALL);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void validateBulkWrittenWithMultipleLeavingNodes(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void LeavingNodeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperSingleLeavingNode.reset();
+        runLeavingTestScenario(cassandraTestContext,
+                               1,
+                               BBHelperSingleLeavingNode::install,
+                               BBHelperSingleLeavingNode.transientStateStart,
+                               BBHelperSingleLeavingNode.transientStateEnd,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    void multipleLeavingNodesOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMultipleLeavingNodes.reset();
         runLeavingTestScenario(cassandraTestContext,
                                2,
                                BBHelperMultipleLeavingNodes::install,
                                BBHelperMultipleLeavingNodes.transientStateStart,
-                               BBHelperMultipleLeavingNodes.transientStateEnd);
+                               BBHelperMultipleLeavingNodes.transientStateEnd,
+                               ConsistencyLevel.ONE,
+                               ConsistencyLevel.ALL);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    void multipleLeavingNodesQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperMultipleLeavingNodes.reset();
+        runLeavingTestScenario(cassandraTestContext,
+                               2,
+                               BBHelperMultipleLeavingNodes::install,
+                               BBHelperMultipleLeavingNodes.transientStateStart,
+                               BBHelperMultipleLeavingNodes.transientStateEnd,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, network = true, gossip = true, buildCluster = false)
-    void validateBulkWrittenWithHalveClusterSize(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void halveClusterSizeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperHalveClusterSize.reset();
         runLeavingTestScenario(cassandraTestContext,
                                3,
                                BBHelperHalveClusterSize::install,
                                BBHelperHalveClusterSize.transientStateStart,
-                               BBHelperHalveClusterSize.transientStateEnd);
+                               BBHelperHalveClusterSize.transientStateEnd,
+                               ConsistencyLevel.ONE,
+                               ConsistencyLevel.ALL);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 6, network = true, gossip = true, buildCluster = false)
+    void halveClusterSizeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperHalveClusterSize.reset();
+        runLeavingTestScenario(cassandraTestContext,
+                               3,
+                               BBHelperHalveClusterSize::install,
+                               BBHelperHalveClusterSize.transientStateStart,
+                               BBHelperHalveClusterSize.transientStateEnd,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM);
     }
 
     void runLeavingTestScenario(ConfigurableCassandraTestContext cassandraTestContext,
                                 int leavingNodesPerDC,
                                 BiConsumer<ClassLoader, Integer> instanceInitializer,
                                 CountDownLatch transientStateStart,
-                                CountDownLatch transientStateEnd)
+                                CountDownLatch transientStateEnd,
+                                ConsistencyLevel readCL,
+                                ConsistencyLevel writeCL)
     throws Exception
     {
 
@@ -100,7 +148,9 @@ class LeavingTest extends LeavingBaseTest
         runLeavingTestScenario(leavingNodesPerDC,
                                transientStateStart,
                                transientStateEnd,
-                               cluster);
+                               cluster,
+                               readCL,
+                               writeCL);
     }
 
     /**

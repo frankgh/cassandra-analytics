@@ -52,7 +52,9 @@ public class JoiningBaseTest extends ResiliencyTestBase
     void runJoiningTestScenario(CountDownLatch transientStateStart,
                                 CountDownLatch transientStateEnd,
                                 UpgradeableCluster cluster,
-                                boolean isCrossDCKeyspace)
+                                boolean isCrossDCKeyspace,
+                                ConsistencyLevel readCL,
+                                ConsistencyLevel writeCL)
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         QualifiedTableName table = null;
@@ -92,16 +94,16 @@ public class JoiningBaseTest extends ResiliencyTestBase
             if (annotation.numDcs() > 1 && isCrossDCKeyspace)
             {
                 List<String> sidecarInstances = generateSidecarInstances((annotation.nodesPerDc() + annotation.newNodesPerDc()) * annotation.numDcs());
-                table = bulkWriteData(ImmutableMap.of("datacenter1", DEFAULT_RF, "datacenter2", DEFAULT_RF), true, sidecarInstances);
+                table = bulkWriteData(ImmutableMap.of("datacenter1", DEFAULT_RF, "datacenter2", DEFAULT_RF), true, sidecarInstances, writeCL.name());
             }
             else
             {
                 List<String> sidecarInstances = generateSidecarInstances(annotation.nodesPerDc() + annotation.newNodesPerDc());
-                table = bulkWriteData(ImmutableMap.of("datacenter1", DEFAULT_RF), false, sidecarInstances);
+                table = bulkWriteData(ImmutableMap.of("datacenter1", DEFAULT_RF), false, sidecarInstances, writeCL.name());
             }
             Session session = maybeGetSession();
             assertNotNull(table);
-            validateData(session, table.tableName(), ConsistencyLevel.ALL);
+            validateData(session, table.tableName(), readCL);
         }
         finally
         {
@@ -115,7 +117,9 @@ public class JoiningBaseTest extends ResiliencyTestBase
     void runJoiningTestScenario(ConfigurableCassandraTestContext cassandraTestContext,
                                 BiConsumer<ClassLoader, Integer> instanceInitializer,
                                 CountDownLatch transientStateStart,
-                                CountDownLatch transientStateEnd)
+                                CountDownLatch transientStateEnd,
+                                ConsistencyLevel readCL,
+                                ConsistencyLevel writeCL)
     throws Exception
     {
 
@@ -133,7 +137,9 @@ public class JoiningBaseTest extends ResiliencyTestBase
         runJoiningTestScenario(transientStateStart,
                                transientStateEnd,
                                cluster,
-                               true);
+                               true,
+                               readCL,
+                               writeCL);
     }
 
     List<String> generateSidecarInstances(int numNodes)
@@ -149,7 +155,8 @@ public class JoiningBaseTest extends ResiliencyTestBase
 
     QualifiedTableName bulkWriteData(ImmutableMap<String, Integer> rf,
                                      boolean isCrossDCKeyspace,
-                                     List<String> sidecarInstances)
+                                     List<String> sidecarInstances,
+                                     String writeCL)
     {
         QualifiedTableName schema = initializeSchema(rf);
 
@@ -159,6 +166,7 @@ public class JoiningBaseTest extends ResiliencyTestBase
 
         DataFrameWriter<Row> dfWriter = df.write()
                                           .format("org.apache.cassandra.spark.sparksql.CassandraDataSink")
+                                          .option("bulk_write_cl", writeCL)
                                           .option("sidecar_instances", String.join(",", sidecarInstances))
                                           .option("sidecar_port", String.valueOf(server.actualPort()))
                                           .option("keyspace", schema.keyspace())
@@ -166,14 +174,9 @@ public class JoiningBaseTest extends ResiliencyTestBase
                                           .option("number_splits", "-1")
                                           .mode("append");
 
-        if (isCrossDCKeyspace)
+        if (!isCrossDCKeyspace)
         {
-            dfWriter.option("bulk_writer_cl", "QUORUM");
-        }
-        else
-        {
-            dfWriter.option("local_dc", "datacenter1")
-                    .option("bulk_writer_cl", "LOCAL_QUORUM");
+            dfWriter.option("local_dc", "datacenter1");
         }
 
         dfWriter.save();

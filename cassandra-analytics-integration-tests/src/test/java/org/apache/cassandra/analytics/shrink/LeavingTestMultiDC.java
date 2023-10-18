@@ -24,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 import com.google.common.util.concurrent.Uninterruptibles;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import com.datastax.driver.core.ConsistencyLevel;
 import io.vertx.junit5.VertxExtension;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
@@ -44,7 +45,7 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 class LeavingTestMultiDC extends LeavingBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void validateBulkWrittenWithLeavingNodesMultiDC(ConfigurableCassandraTestContext cassandraTestContext)
+    void multiDCAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext)
     throws Exception
     {
         BBHelperLeavingNodesMultiDC.reset();
@@ -54,7 +55,25 @@ class LeavingTestMultiDC extends LeavingBaseTest
         runLeavingTestScenario(leavingNodesPerDC,
                                BBHelperLeavingNodesMultiDC.transientStateStart,
                                BBHelperLeavingNodesMultiDC.transientStateEnd,
-                               cluster);
+                               cluster,
+                               ConsistencyLevel.ALL,
+                               ConsistencyLevel.ONE);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void multiDCQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
+    {
+        BBHelperLeavingNodesMultiDC.reset();
+        int leavingNodesPerDC = 1;
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperLeavingNodesMultiDC::install, cassandraTestContext);
+
+        runLeavingTestScenario(leavingNodesPerDC,
+                               BBHelperLeavingNodesMultiDC.transientStateStart,
+                               BBHelperLeavingNodesMultiDC.transientStateEnd,
+                               cluster,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM);
     }
 
     /**

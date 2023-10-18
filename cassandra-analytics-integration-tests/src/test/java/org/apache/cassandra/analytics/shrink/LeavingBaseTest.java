@@ -75,7 +75,9 @@ class LeavingBaseTest extends ResiliencyTestBase
 
             table = bulkWriteData(annotation.numDcs() > 1, writeCL);
 
-            // fail the leave
+            Session session = maybeGetSession();
+            assertNotNull(table);
+            validateData(session, table.tableName(), readCL);
         }
         finally
         {
@@ -83,9 +85,6 @@ class LeavingBaseTest extends ResiliencyTestBase
             {
                 transientStateEnd.countDown();
             }
-            Session session = maybeGetSession();
-            assertNotNull(table);
-            validateData(session, table.tableName(), readCL);
         }
     }
 }

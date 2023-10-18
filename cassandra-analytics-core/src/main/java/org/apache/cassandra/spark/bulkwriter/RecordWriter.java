@@ -259,7 +259,7 @@ public class RecordWriter implements Serializable
         // Get the uncached, current view of the ring to compare with initial ring
         TokenRangeMapping<RingInstance> endTaskMapping = writerContext.cluster().getTokenRangeMapping(false);
         Set<RingInstance> endInstances = getTokenRangeInstances(endTaskMapping, getTokenRange(taskContext));
-        return initialInstances.size() != endInstances.size() || !initialInstances.equals(endInstances);
+        return !initialInstances.equals(endInstances);
     }
 
     private void validateAcceptableTimeSkewOrThrow(List<RingInstance> replicas)

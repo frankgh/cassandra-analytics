@@ -201,6 +201,7 @@ public class CassandraSidecarTestContext implements AutoCloseable
         List<InstanceMetadata> metadata = new ArrayList<>();
         sessionProviders = new ArrayList<>();
         jmxClients = new ArrayList<>();
+        List<InetSocketAddress> addresses = new ArrayList<>();
         for (int i = 0; i < cluster.size(); i++)
         {
             IUpgradeableInstance instance = cluster.get(i + 1); // 1-based indexing to match node names;
@@ -209,7 +210,17 @@ public class CassandraSidecarTestContext implements AutoCloseable
             int nativeTransportPort = tryGetIntConfig(config, "native_transport_port", 9042);
             InetSocketAddress address = InetSocketAddress.createUnresolved(hostName,
                                                                            nativeTransportPort);
-            CQLSessionProvider sessionProvider = new CQLSessionProvider(address, new NettyOptions());
+            addresses.add(address);
+        }
+        for (int i = 0; i < cluster.size(); i++)
+        {
+            IUpgradeableInstance instance = cluster.get(i + 1); // 1-based indexing to match node names;
+            IInstanceConfig config = instance.config();
+            String hostName = JMXUtil.getJmxHost(config);
+            int nativeTransportPort = tryGetIntConfig(config, "native_transport_port", 9042);
+            InetSocketAddress address = InetSocketAddress.createUnresolved(hostName,
+                                                                           nativeTransportPort);
+            TemporaryCqlSessionProvider sessionProvider = new TemporaryCqlSessionProvider(address, new NettyOptions(), addresses);
             this.sessionProviders.add(sessionProvider);
             JmxClient jmxClient = new JmxClient(hostName, config.jmxPort());
             this.jmxClients.add(jmxClient);

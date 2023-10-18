@@ -89,7 +89,7 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         SparkConf sparkConf = new SparkConf()
                               .setAppName("Integration test Spark Cassandra Bulk Reader Job")
                               .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-                              .set("spark.master", "local[8]");
+                              .set("spark.master", "local[8,4]");
         BulkSparkConf.setupSparkConf(sparkConf, true);
         KryoRegister.setup(sparkConf);
         return sparkConf;

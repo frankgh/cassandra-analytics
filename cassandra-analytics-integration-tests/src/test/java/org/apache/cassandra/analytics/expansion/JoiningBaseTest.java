@@ -99,6 +99,9 @@ public class JoiningBaseTest extends ResiliencyTestBase
                 List<String> sidecarInstances = generateSidecarInstances(annotation.nodesPerDc() + annotation.newNodesPerDc());
                 table = bulkWriteData(ImmutableMap.of("datacenter1", DEFAULT_RF), false, sidecarInstances);
             }
+            Session session = maybeGetSession();
+            assertNotNull(table);
+            validateData(session, table.tableName(), ConsistencyLevel.ALL);
         }
         finally
         {
@@ -106,9 +109,6 @@ public class JoiningBaseTest extends ResiliencyTestBase
             {
                 transientStateEnd.countDown();
             }
-            Session session = maybeGetSession();
-            assertNotNull(table);
-            validateData(session, table.tableName(), ConsistencyLevel.QUORUM);
         }
     }
 

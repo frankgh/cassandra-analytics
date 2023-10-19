@@ -58,7 +58,7 @@ public class ClusterExpansionTest extends ResiliencyTestBase
     @CassandraIntegrationTest(nodesPerDc = 3, gossip = true, network = true)
     public void sampleResiliencyTest()
     {
-        QualifiedTableName schema = bulkWriteData();
+        QualifiedTableName schema = bulkWriteData(ConsistencyLevel.QUORUM);
 
         Session session = maybeGetSession();
         validateData(session, schema.tableName(), ConsistencyLevel.EACH_QUORUM);
@@ -142,7 +142,7 @@ public class ClusterExpansionTest extends ResiliencyTestBase
                 ClusterUtils.awaitRingState(seed, newInstance, "Joining");
             }
 
-            schema = bulkWriteData();
+            schema = bulkWriteData(ConsistencyLevel.QUORUM);
         }
         finally
         {

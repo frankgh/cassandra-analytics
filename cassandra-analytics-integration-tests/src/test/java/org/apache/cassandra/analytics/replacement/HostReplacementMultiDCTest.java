@@ -24,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
+import com.datastax.driver.core.ConsistencyLevel;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -53,7 +54,10 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
                            BBHelperNodeReplacementMultiDC.transientStateEnd,
                            BBHelperNodeReplacementMultiDC.nodeStart,
                            true,
-                           false);
+                           false,
+                           ConsistencyLevel.LOCAL_QUORUM,
+                           ConsistencyLevel.LOCAL_QUORUM);
+
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
@@ -67,7 +71,10 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
                            BBHelperReplacementFailureMultiDC.transientStateEnd,
                            BBHelperReplacementFailureMultiDC.nodeStart,
                            true,
-                           true);
+                           true,
+                           ConsistencyLevel.LOCAL_QUORUM,
+                           ConsistencyLevel.LOCAL_QUORUM);
+
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
@@ -82,7 +89,10 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
                            BBHelperNodeReplacementMultiDCInsufficientReplicas.nodeStart,
                            true,
                            true,
-                           true);
+                           true,
+                           ConsistencyLevel.LOCAL_QUORUM,
+                           ConsistencyLevel.LOCAL_QUORUM);
+
     }
 
     /**

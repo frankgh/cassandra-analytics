@@ -25,6 +25,7 @@ import java.util.concurrent.Future;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
+import com.datastax.driver.core.ConsistencyLevel;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -50,7 +51,9 @@ public class NodeMovementTest extends NodeMovementBaseTest
                           BBHelperMovingNode.transientStateStart,
                           BBHelperMovingNode.transientStateEnd,
                           false,
-                          false);
+                          false,
+                          ConsistencyLevel.QUORUM,
+                          ConsistencyLevel.QUORUM);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
@@ -62,7 +65,9 @@ public class NodeMovementTest extends NodeMovementBaseTest
                           BBHelperMovingNodeFailure.transientStateStart,
                           BBHelperMovingNodeFailure.transientStateEnd,
                           false,
-                          true);
+                          true,
+                          ConsistencyLevel.QUORUM,
+                          ConsistencyLevel.QUORUM);
     }
 
     /**

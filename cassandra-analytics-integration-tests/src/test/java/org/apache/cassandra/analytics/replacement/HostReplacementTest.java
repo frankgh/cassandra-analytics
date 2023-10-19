@@ -24,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
+import com.datastax.driver.core.ConsistencyLevel;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -43,7 +44,7 @@ public class HostReplacementTest extends HostReplacementBaseTest
 {
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementDuringBulkWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void hostReplacementQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperReplacementsNode.reset();
         runReplacementTest(cassandraTestContext,
@@ -52,7 +53,57 @@ public class HostReplacementTest extends HostReplacementBaseTest
                            BBHelperReplacementsNode.transientStateEnd,
                            BBHelperReplacementsNode.nodeStart,
                            false,
-                           false);
+                           false,
+                           ConsistencyLevel.QUORUM,
+                           ConsistencyLevel.QUORUM);
+    }
+
+    // Note: The following test depends on sidecar fix: https://issues.apache.org/jira/browse/CASSANDRASC-78
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    void hostReplacementOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperReplacementsNode.reset();
+        runReplacementTest(cassandraTestContext,
+                           BBHelperReplacementsNode::install,
+                           BBHelperReplacementsNode.transientStateStart,
+                           BBHelperReplacementsNode.transientStateEnd,
+                           BBHelperReplacementsNode.nodeStart,
+                           false,
+                           false,
+                           ConsistencyLevel.ONE,
+                           ConsistencyLevel.ALL);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    void hostReplacementFailureQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperReplacementsNodeFailure.reset();
+        runReplacementTest(cassandraTestContext,
+                           BBHelperReplacementsNodeFailure::install,
+                           BBHelperReplacementsNodeFailure.transientStateStart,
+                           BBHelperReplacementsNodeFailure.transientStateEnd,
+                           BBHelperReplacementsNodeFailure.nodeStart,
+                           false,
+                           true,
+                           ConsistencyLevel.QUORUM,
+                           ConsistencyLevel.QUORUM);
+
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    void hostReplacementFailureOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperReplacementsNodeFailure.reset();
+        runReplacementTest(cassandraTestContext,
+                           BBHelperReplacementsNodeFailure::install,
+                           BBHelperReplacementsNodeFailure.transientStateStart,
+                           BBHelperReplacementsNodeFailure.transientStateEnd,
+                           BBHelperReplacementsNodeFailure.nodeStart,
+                           false,
+                           true,
+                           ConsistencyLevel.ONE,
+                           ConsistencyLevel.ALL);
+
     }
 
     /**
@@ -103,19 +154,6 @@ public class HostReplacementTest extends HostReplacementBaseTest
             transientStateStart = new CountDownLatch(1);
             transientStateEnd = new CountDownLatch(1);
         }
-    }
-
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementFailureDuringBulkWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
-    {
-        BBHelperReplacementsNodeFailure.reset();
-        runReplacementTest(cassandraTestContext,
-                           BBHelperReplacementsNodeFailure::install,
-                           BBHelperReplacementsNodeFailure.transientStateStart,
-                           BBHelperReplacementsNodeFailure.transientStateEnd,
-                           BBHelperReplacementsNodeFailure.nodeStart,
-                           false,
-                           true);
     }
 
     /**

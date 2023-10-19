@@ -25,6 +25,7 @@ import java.util.concurrent.Future;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
+import com.datastax.driver.core.ConsistencyLevel;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -47,11 +48,14 @@ public class NodeMovementTestMultiDC extends NodeMovementBaseTest
     {
         BBHelperMovingNodeMultiDC.reset();
         runMovingNodeTest(cassandraTestContext,
-                                 BBHelperMovingNodeMultiDC::install,
-                                 BBHelperMovingNodeMultiDC.transientStateStart,
-                                 BBHelperMovingNodeMultiDC.transientStateEnd,
-                                 true,
-                                 false);
+                          BBHelperMovingNodeMultiDC::install,
+                          BBHelperMovingNodeMultiDC.transientStateStart,
+                          BBHelperMovingNodeMultiDC.transientStateEnd,
+                          true,
+                          false,
+                          ConsistencyLevel.QUORUM,
+                          ConsistencyLevel.QUORUM);
+
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
@@ -59,11 +63,14 @@ public class NodeMovementTestMultiDC extends NodeMovementBaseTest
     {
         BBHelperMultiDCMovingNodeFailure.reset();
         runMovingNodeTest(cassandraTestContext,
-                                 BBHelperMultiDCMovingNodeFailure::install,
-                                 BBHelperMultiDCMovingNodeFailure.transientStateStart,
-                                 BBHelperMultiDCMovingNodeFailure.transientStateEnd,
-                                 true,
-                                 true);
+                          BBHelperMultiDCMovingNodeFailure::install,
+                          BBHelperMultiDCMovingNodeFailure.transientStateStart,
+                          BBHelperMultiDCMovingNodeFailure.transientStateEnd,
+                          true,
+                          true,
+                          ConsistencyLevel.QUORUM,
+                          ConsistencyLevel.QUORUM);
+
     }
 
     /**

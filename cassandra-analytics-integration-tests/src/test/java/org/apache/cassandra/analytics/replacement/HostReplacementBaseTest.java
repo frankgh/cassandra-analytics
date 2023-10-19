@@ -57,7 +57,9 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                             CountDownLatch transientStateEnd,
                             CountDownLatch nodeStart,
                             boolean isCrossDCKeyspace,
-                            boolean isFailure) throws IOException
+                            boolean isFailure,
+                            ConsistencyLevel readCL,
+                            ConsistencyLevel writeCL) throws IOException
     {
         runReplacementTest(cassandraTestContext,
                            instanceInitializer,
@@ -66,7 +68,9 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                            nodeStart,
                            isCrossDCKeyspace,
                            isFailure,
-                           false);
+                           false,
+                           readCL,
+                           writeCL);
     }
 
     void runReplacementTest(ConfigurableCassandraTestContext cassandraTestContext,
@@ -76,7 +80,9 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                             CountDownLatch nodeStart,
                             boolean isCrossDCKeyspace,
                             boolean isFailure,
-                            boolean shouldWriteFail) throws IOException
+                            boolean shouldWriteFail,
+                            ConsistencyLevel readCL,
+                            ConsistencyLevel writeCL) throws IOException
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         TokenSupplier tokenSupplier = TestTokenSupplier.evenlyDistributedTokens(annotation.nodesPerDc(),
@@ -132,7 +138,7 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                 }
                 else
                 {
-                    schema = bulkWriteData(isCrossDCKeyspace, ConsistencyLevel.QUORUM);
+                    schema = bulkWriteData(isCrossDCKeyspace, writeCL);
                 }
             }
         }
@@ -152,7 +158,7 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
             }
 
             Session session = maybeGetSession();
-            validateData(session, schema.tableName(), ConsistencyLevel.QUORUM);
+            validateData(session, schema.tableName(), readCL);
 
             if (isFailure)
             {

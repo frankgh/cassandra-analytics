@@ -46,6 +46,18 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 public class JoiningTestSingleNode extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    void singleJoinNodeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperSingleJoiningNode.reset();
+        runJoiningTestScenario(cassandraTestContext,
+                               BBHelperSingleJoiningNode::install,
+                               BBHelperSingleJoiningNode.transientStateStart,
+                               BBHelperSingleJoiningNode.transientStateEnd,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
     void singleJoinNodeOneReadALLWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleJoiningNode.reset();

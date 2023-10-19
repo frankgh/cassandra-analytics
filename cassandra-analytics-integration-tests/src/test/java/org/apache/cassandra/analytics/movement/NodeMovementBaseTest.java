@@ -50,7 +50,10 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
                            CountDownLatch transientStateStart,
                            CountDownLatch transientStateEnd,
                            boolean isCrossDCKeyspace,
-                           boolean isFailure) throws IOException
+                           boolean isFailure,
+                           ConsistencyLevel readCL,
+                           ConsistencyLevel writeCL) throws IOException
+
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         TokenSupplier tokenSupplier = TestTokenSupplier.evenlyDistributedTokens(annotation.nodesPerDc(),
@@ -89,7 +92,7 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
             // Wait until nodes have reached expected state
             Uninterruptibles.awaitUninterruptibly(transientStateStart, 2, TimeUnit.MINUTES);
             ClusterUtils.awaitRingState(seed, movingNode, "Moving");
-            schema = bulkWriteData(isCrossDCKeyspace, ConsistencyLevel.QUORUM);
+            schema = bulkWriteData(isCrossDCKeyspace, writeCL);
         }
         finally
         {
@@ -101,7 +104,7 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
             ClusterUtils.awaitRingState(cluster.get(1), movingNode, "Normal");
         }
         Session session = maybeGetSession();
-        validateData(session, schema.tableName(), ConsistencyLevel.QUORUM);
+        validateData(session, schema.tableName(), readCL);
 
         if (isFailure)
         {

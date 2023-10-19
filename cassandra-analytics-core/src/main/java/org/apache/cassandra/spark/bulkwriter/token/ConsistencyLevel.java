@@ -73,7 +73,8 @@ public interface ConsistencyLevel
                                             final Collection<? extends CassandraInstance> failedInsts,
                                             final String localDC)
             {
-                return failedInsts.isEmpty() && tokenRangeMapping.getBlockedInstances().isEmpty();
+                int failedExcludingReplacements = failedInsts.size() - tokenRangeMapping.getReplacementInstances().size();
+                return failedExcludingReplacements <= 0 && tokenRangeMapping.getBlockedInstances().isEmpty();
             }
         },
 

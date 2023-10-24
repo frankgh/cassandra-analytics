@@ -48,7 +48,8 @@ public class JoiningBaseTest extends ResiliencyTestBase
                                 UpgradeableCluster cluster,
                                 boolean isCrossDCKeyspace,
                                 ConsistencyLevel readCL,
-                                ConsistencyLevel writeCL)
+                                ConsistencyLevel writeCL,
+                                boolean isFailure)
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         QualifiedTableName table = null;
@@ -85,11 +86,12 @@ public class JoiningBaseTest extends ResiliencyTestBase
                 ClusterUtils.awaitRingState(seed, newInstance, "Joining");
             }
 
-            table = bulkWriteData(isCrossDCKeyspace, writeCL);
-
-            Session session = maybeGetSession();
-            assertNotNull(table);
-            validateData(session, table.tableName(), readCL);
+            if (!isFailure) {
+                table = bulkWriteData(isCrossDCKeyspace, writeCL);
+                Session session = maybeGetSession();
+                assertNotNull(table);
+                validateData(session, table.tableName(), readCL);
+            }
         }
         finally
         {
@@ -98,6 +100,13 @@ public class JoiningBaseTest extends ResiliencyTestBase
                 transientStateEnd.countDown();
             }
         }
+
+        if (isFailure) {
+            table = bulkWriteData(isCrossDCKeyspace, writeCL);
+            Session session = maybeGetSession();
+            assertNotNull(table);
+            validateData(session, table.tableName(), readCL);
+        }
     }
 
     void runJoiningTestScenario(ConfigurableCassandraTestContext cassandraTestContext,
@@ -105,7 +114,8 @@ public class JoiningBaseTest extends ResiliencyTestBase
                                 CountDownLatch transientStateStart,
                                 CountDownLatch transientStateEnd,
                                 ConsistencyLevel readCL,
-                                ConsistencyLevel writeCL)
+                                ConsistencyLevel writeCL,
+                                boolean isFailure)
     throws Exception
     {
 
@@ -125,6 +135,7 @@ public class JoiningBaseTest extends ResiliencyTestBase
                                cluster,
                                true,
                                readCL,
-                               writeCL);
+                               writeCL,
+                               isFailure);
     }
 }

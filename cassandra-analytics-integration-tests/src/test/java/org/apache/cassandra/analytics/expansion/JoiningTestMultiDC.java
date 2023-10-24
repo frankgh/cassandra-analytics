@@ -47,7 +47,7 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 public class JoiningTestMultiDC extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void multiDCMultipleJoiningNodeAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void allReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext)
     throws Exception
     {
         BBHelperDoubleClusterMultiDC.reset();
@@ -58,11 +58,12 @@ public class JoiningTestMultiDC extends JoiningBaseTest
                                cluster,
                                true,
                                ConsistencyLevel.ALL,
-                               ConsistencyLevel.ONE);
+                               ConsistencyLevel.ONE,
+                               false);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void multiDCMultipleJoiningNodeFailureAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void allReadOneWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
     throws Exception
     {
         BBHelperDoubleClusterMultiDC.reset();
@@ -73,11 +74,76 @@ public class JoiningTestMultiDC extends JoiningBaseTest
                                cluster,
                                true,
                                ConsistencyLevel.ALL,
-                               ConsistencyLevel.ONE);
+                               ConsistencyLevel.ONE,
+                               true);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void multiDCMultipleJoiningNodeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void localQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
+    {
+        BBHelperDoubleClusterMultiDC.reset();
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperDoubleClusterMultiDC::install, cassandraTestContext);
+
+        runJoiningTestScenario(BBHelperDoubleClusterMultiDC.transientStateStart,
+                               BBHelperDoubleClusterMultiDC.transientStateEnd,
+                               cluster,
+                               true,
+                               ConsistencyLevel.LOCAL_QUORUM,
+                               ConsistencyLevel.LOCAL_QUORUM,
+                               false);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void localQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
+    {
+        BBHelperDoubleClusterMultiDC.reset();
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperDoubleClusterMultiDCFailure::install, cassandraTestContext);
+
+        runJoiningTestScenario(BBHelperDoubleClusterMultiDC.transientStateStart,
+                               BBHelperDoubleClusterMultiDC.transientStateEnd,
+                               cluster,
+                               true,
+                               ConsistencyLevel.LOCAL_QUORUM,
+                               ConsistencyLevel.LOCAL_QUORUM,
+                               true);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void eachQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
+    {
+        BBHelperDoubleClusterMultiDC.reset();
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperDoubleClusterMultiDC::install, cassandraTestContext);
+
+        runJoiningTestScenario(BBHelperDoubleClusterMultiDC.transientStateStart,
+                               BBHelperDoubleClusterMultiDC.transientStateEnd,
+                               cluster,
+                               true,
+                               ConsistencyLevel.EACH_QUORUM,
+                               ConsistencyLevel.LOCAL_QUORUM,
+                               false);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void eachQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
+    {
+        BBHelperDoubleClusterMultiDC.reset();
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperDoubleClusterMultiDCFailure::install, cassandraTestContext);
+
+        runJoiningTestScenario(BBHelperDoubleClusterMultiDC.transientStateStart,
+                               BBHelperDoubleClusterMultiDC.transientStateEnd,
+                               cluster,
+                               true,
+                               ConsistencyLevel.EACH_QUORUM,
+                               ConsistencyLevel.LOCAL_QUORUM,
+                               true);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
     throws Exception
     {
         BBHelperDoubleClusterMultiDC.reset();
@@ -88,11 +154,12 @@ public class JoiningTestMultiDC extends JoiningBaseTest
                                cluster,
                                true,
                                ConsistencyLevel.QUORUM,
-                               ConsistencyLevel.QUORUM);
+                               ConsistencyLevel.QUORUM,
+                               false);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void multiDCMultipleJoiningNodeFailureQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
     throws Exception
     {
         BBHelperDoubleClusterMultiDC.reset();
@@ -103,7 +170,40 @@ public class JoiningTestMultiDC extends JoiningBaseTest
                                cluster,
                                true,
                                ConsistencyLevel.QUORUM,
-                               ConsistencyLevel.QUORUM);
+                               ConsistencyLevel.QUORUM,
+                               true);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
+    {
+        BBHelperDoubleClusterMultiDC.reset();
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperDoubleClusterMultiDC::install, cassandraTestContext);
+
+        runJoiningTestScenario(BBHelperDoubleClusterMultiDC.transientStateStart,
+                               BBHelperDoubleClusterMultiDC.transientStateEnd,
+                               cluster,
+                               true,
+                               ConsistencyLevel.ONE,
+                               ConsistencyLevel.ALL,
+                               false);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    throws Exception
+    {
+        BBHelperDoubleClusterMultiDC.reset();
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperDoubleClusterMultiDCFailure::install, cassandraTestContext);
+
+        runJoiningTestScenario(BBHelperDoubleClusterMultiDC.transientStateStart,
+                               BBHelperDoubleClusterMultiDC.transientStateEnd,
+                               cluster,
+                               true,
+                               ConsistencyLevel.ONE,
+                               ConsistencyLevel.ALL,
+                               true);
     }
 
     /**

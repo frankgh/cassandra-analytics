@@ -46,7 +46,7 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 public class JoiningTestMultipleNodes extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
-    void multipleJoiningNodesAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext)
     throws Exception
     {
         BBHelperMultipleJoiningNodes.reset();
@@ -55,11 +55,12 @@ public class JoiningTestMultipleNodes extends JoiningBaseTest
                                BBHelperMultipleJoiningNodes.transientStateStart,
                                BBHelperMultipleJoiningNodes.transientStateEnd,
                                ConsistencyLevel.ONE,
-                               ConsistencyLevel.ALL);
+                               ConsistencyLevel.ALL,
+                               false);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
-    void multipleJoiningNodesFailureAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
     throws Exception
     {
         BBHelperMultipleJoiningNodesFailure.reset();
@@ -68,11 +69,12 @@ public class JoiningTestMultipleNodes extends JoiningBaseTest
                                BBHelperMultipleJoiningNodes.transientStateStart,
                                BBHelperMultipleJoiningNodes.transientStateEnd,
                                ConsistencyLevel.ONE,
-                               ConsistencyLevel.ALL);
+                               ConsistencyLevel.ALL,
+                               true);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
-    void multipleJoiningNodesQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
     throws Exception
     {
         BBHelperMultipleJoiningNodes.reset();
@@ -81,11 +83,12 @@ public class JoiningTestMultipleNodes extends JoiningBaseTest
                                BBHelperMultipleJoiningNodes.transientStateStart,
                                BBHelperMultipleJoiningNodes.transientStateEnd,
                                ConsistencyLevel.QUORUM,
-                               ConsistencyLevel.QUORUM);
+                               ConsistencyLevel.QUORUM,
+                               false);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
-    void multipleJoiningNodesFailureQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
     throws Exception
     {
         BBHelperMultipleJoiningNodesFailure.reset();
@@ -94,7 +97,8 @@ public class JoiningTestMultipleNodes extends JoiningBaseTest
                                BBHelperMultipleJoiningNodes.transientStateStart,
                                BBHelperMultipleJoiningNodes.transientStateEnd,
                                ConsistencyLevel.QUORUM,
-                               ConsistencyLevel.QUORUM);
+                               ConsistencyLevel.QUORUM,
+                               true);
     }
 
     /**

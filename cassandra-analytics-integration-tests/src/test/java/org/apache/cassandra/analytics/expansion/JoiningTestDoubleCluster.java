@@ -46,7 +46,7 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 public class JoiningTestDoubleCluster extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void singleDCDoubleClusterOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperDoubleClusterSize.reset();
         runJoiningTestScenario(cassandraTestContext,
@@ -54,11 +54,12 @@ public class JoiningTestDoubleCluster extends JoiningBaseTest
                                BBHelperDoubleClusterSize.transientStateStart,
                                BBHelperDoubleClusterSize.transientStateEnd,
                                ConsistencyLevel.ONE,
-                               ConsistencyLevel.ALL);
+                               ConsistencyLevel.ALL,
+                               false);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void singleDCDoubleClusterFailureOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperDoubleClusterSizeFailure.reset();
         runJoiningTestScenario(cassandraTestContext,
@@ -66,11 +67,12 @@ public class JoiningTestDoubleCluster extends JoiningBaseTest
                                BBHelperDoubleClusterSize.transientStateStart,
                                BBHelperDoubleClusterSize.transientStateEnd,
                                ConsistencyLevel.ONE,
-                               ConsistencyLevel.ALL);
+                               ConsistencyLevel.ALL,
+                               true);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void singleDCDoubleClusterQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperDoubleClusterSize.reset();
         runJoiningTestScenario(cassandraTestContext,
@@ -78,11 +80,12 @@ public class JoiningTestDoubleCluster extends JoiningBaseTest
                                BBHelperDoubleClusterSize.transientStateStart,
                                BBHelperDoubleClusterSize.transientStateEnd,
                                ConsistencyLevel.QUORUM,
-                               ConsistencyLevel.QUORUM);
+                               ConsistencyLevel.QUORUM,
+                               false);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void singleDCDoubleClusterFailureQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperDoubleClusterSizeFailure.reset();
         runJoiningTestScenario(cassandraTestContext,
@@ -90,7 +93,8 @@ public class JoiningTestDoubleCluster extends JoiningBaseTest
                                BBHelperDoubleClusterSize.transientStateStart,
                                BBHelperDoubleClusterSize.transientStateEnd,
                                ConsistencyLevel.QUORUM,
-                               ConsistencyLevel.QUORUM);
+                               ConsistencyLevel.QUORUM,
+                               true);
     }
 
     /**

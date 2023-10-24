@@ -46,19 +46,7 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 public class JoiningTestSingleNode extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void singleJoinNodeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
-    {
-        BBHelperSingleJoiningNode.reset();
-        runJoiningTestScenario(cassandraTestContext,
-                               BBHelperSingleJoiningNode::install,
-                               BBHelperSingleJoiningNode.transientStateStart,
-                               BBHelperSingleJoiningNode.transientStateEnd,
-                               ConsistencyLevel.QUORUM,
-                               ConsistencyLevel.QUORUM);
-    }
-
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void singleJoinNodeOneReadALLWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void oneReadALLWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleJoiningNode.reset();
         runJoiningTestScenario(cassandraTestContext,
@@ -66,11 +54,12 @@ public class JoiningTestSingleNode extends JoiningBaseTest
                                BBHelperSingleJoiningNode.transientStateStart,
                                BBHelperSingleJoiningNode.transientStateEnd,
                                ConsistencyLevel.ONE,
-                               ConsistencyLevel.ALL);
+                               ConsistencyLevel.ALL,
+                               false);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void singleJoinNodeFailureOneReadALLWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void oneReadALLWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleJoiningNodeFailure.reset();
         runJoiningTestScenario(cassandraTestContext,
@@ -78,11 +67,25 @@ public class JoiningTestSingleNode extends JoiningBaseTest
                                BBHelperSingleJoiningNode.transientStateStart,
                                BBHelperSingleJoiningNode.transientStateEnd,
                                ConsistencyLevel.ONE,
-                               ConsistencyLevel.ALL);
+                               ConsistencyLevel.ALL,
+                               true);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void singleJoinNodeFailureQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperSingleJoiningNode.reset();
+        runJoiningTestScenario(cassandraTestContext,
+                               BBHelperSingleJoiningNode::install,
+                               BBHelperSingleJoiningNode.transientStateStart,
+                               BBHelperSingleJoiningNode.transientStateEnd,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM,
+                               false);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleJoiningNodeFailure.reset();
         runJoiningTestScenario(cassandraTestContext,
@@ -90,7 +93,8 @@ public class JoiningTestSingleNode extends JoiningBaseTest
                                BBHelperSingleJoiningNode.transientStateStart,
                                BBHelperSingleJoiningNode.transientStateEnd,
                                ConsistencyLevel.QUORUM,
-                               ConsistencyLevel.QUORUM);
+                               ConsistencyLevel.QUORUM,
+                               true);
     }
 
     /**

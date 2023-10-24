@@ -43,6 +43,8 @@ import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.distributed.UpgradeableCluster;
+import org.apache.cassandra.distributed.api.IUpgradeableInstance;
+import org.apache.cassandra.distributed.api.SimpleQueryResult;
 import org.apache.cassandra.distributed.api.TokenSupplier;
 import org.apache.cassandra.sidecar.testing.IntegrationTestBase;
 import org.apache.cassandra.spark.KryoRegister;
@@ -142,6 +144,27 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         for (int i = 0; i < rowCount; i++)
         {
             String expectedRow = i + ":course" + i + ":" + i;
+            rows.remove(expectedRow);
+        }
+        assertTrue(rows.isEmpty());
+    }
+
+    public void validateDataInTransientNode(IUpgradeableInstance instance, String tableName, Set<String> expectedRows)
+    {
+        SimpleQueryResult qr = instance.executeInternalWithResult(String.format(retrieveRows, tableName));
+        Set<String> rows = new HashSet<>();
+        org.apache.cassandra.distributed.api.Row row = qr.next();
+        do
+        {
+            int id = row.getInteger("id");
+            String course = row.getString("course");
+            int marks = row.getInteger("marks");
+            rows.add(id + ":" + course + ":" + marks);
+            row = qr.next();
+        } while (row != null);
+
+        for (String expectedRow : expectedRows)
+        {
             rows.remove(expectedRow);
         }
         assertTrue(rows.isEmpty());

@@ -43,7 +43,7 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 public class NodeMovementTest extends NodeMovementBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void moveNodeDuringBulkWriteTest(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void moveNodeQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMovingNode.reset();
         runMovingNodeTest(cassandraTestContext,
@@ -57,7 +57,35 @@ public class NodeMovementTest extends NodeMovementBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void moveNodeFailedDuringBulkWriteTest(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void moveNodeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperMovingNode.reset();
+        runMovingNodeTest(cassandraTestContext,
+                          BBHelperMovingNode::install,
+                          BBHelperMovingNode.transientStateStart,
+                          BBHelperMovingNode.transientStateEnd,
+                          false,
+                          false,
+                          ConsistencyLevel.ONE,
+                          ConsistencyLevel.ALL);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    void moveNodeAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperMovingNode.reset();
+        runMovingNodeTest(cassandraTestContext,
+                          BBHelperMovingNode::install,
+                          BBHelperMovingNode.transientStateStart,
+                          BBHelperMovingNode.transientStateEnd,
+                          false,
+                          false,
+                          ConsistencyLevel.ALL,
+                          ConsistencyLevel.ONE);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    void moveNodeFailureQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMovingNodeFailure.reset();
         runMovingNodeTest(cassandraTestContext,
@@ -68,6 +96,20 @@ public class NodeMovementTest extends NodeMovementBaseTest
                           true,
                           ConsistencyLevel.QUORUM,
                           ConsistencyLevel.QUORUM);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    void moveNodeFailureOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperMovingNodeFailure.reset();
+        runMovingNodeTest(cassandraTestContext,
+                          BBHelperMovingNodeFailure::install,
+                          BBHelperMovingNodeFailure.transientStateStart,
+                          BBHelperMovingNodeFailure.transientStateEnd,
+                          false,
+                          true,
+                          ConsistencyLevel.ONE,
+                          ConsistencyLevel.ALL);
     }
 
     /**

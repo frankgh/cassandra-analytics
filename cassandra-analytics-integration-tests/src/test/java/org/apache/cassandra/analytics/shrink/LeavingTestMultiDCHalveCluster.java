@@ -45,7 +45,7 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 class LeavingTestMultiDCHalveCluster extends LeavingBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void multiDCHalveClusterSizeAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void allReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperHalveClusterMultiDC.reset();
         int leavingNodesPerDC = 3;
@@ -56,11 +56,44 @@ class LeavingTestMultiDCHalveCluster extends LeavingBaseTest
                                BBHelperHalveClusterMultiDC.transientStateEnd,
                                cluster,
                                ConsistencyLevel.ALL,
-                               ConsistencyLevel.ONE);
+                               ConsistencyLevel.ONE,
+                               false);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void multiDCHalveClusterSizeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void localQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperHalveClusterMultiDC.reset();
+        int leavingNodesPerDC = 3;
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperHalveClusterMultiDC::install, cassandraTestContext);
+
+        runLeavingTestScenario(leavingNodesPerDC,
+                               BBHelperHalveClusterMultiDC.transientStateStart,
+                               BBHelperHalveClusterMultiDC.transientStateEnd,
+                               cluster,
+                               ConsistencyLevel.LOCAL_QUORUM,
+                               ConsistencyLevel.LOCAL_QUORUM,
+                               false);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void localQuorumReadEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperHalveClusterMultiDC.reset();
+        int leavingNodesPerDC = 3;
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperHalveClusterMultiDC::install, cassandraTestContext);
+
+        runLeavingTestScenario(leavingNodesPerDC,
+                               BBHelperHalveClusterMultiDC.transientStateStart,
+                               BBHelperHalveClusterMultiDC.transientStateEnd,
+                               cluster,
+                               ConsistencyLevel.LOCAL_QUORUM,
+                               ConsistencyLevel.EACH_QUORUM,
+                               false);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperHalveClusterMultiDC.reset();
         int leavingNodesPerDC = 3;
@@ -71,7 +104,24 @@ class LeavingTestMultiDCHalveCluster extends LeavingBaseTest
                                BBHelperHalveClusterMultiDC.transientStateEnd,
                                cluster,
                                ConsistencyLevel.QUORUM,
-                               ConsistencyLevel.QUORUM);
+                               ConsistencyLevel.QUORUM,
+                               false);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperHalveClusterMultiDC.reset();
+        int leavingNodesPerDC = 3;
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperHalveClusterMultiDC::install, cassandraTestContext);
+
+        runLeavingTestScenario(leavingNodesPerDC,
+                               BBHelperHalveClusterMultiDC.transientStateStart,
+                               BBHelperHalveClusterMultiDC.transientStateEnd,
+                               cluster,
+                               ConsistencyLevel.ONE,
+                               ConsistencyLevel.ALL,
+                               false);
     }
 
     /**

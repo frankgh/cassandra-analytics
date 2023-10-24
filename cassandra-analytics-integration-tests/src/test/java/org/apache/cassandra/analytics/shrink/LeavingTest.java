@@ -48,7 +48,7 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 class LeavingTest extends LeavingBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void leavingNodeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void singleLeavingNodeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleLeavingNode.reset();
         runLeavingTestScenario(cassandraTestContext,
@@ -57,11 +57,26 @@ class LeavingTest extends LeavingBaseTest
                                BBHelperSingleLeavingNode.transientStateStart,
                                BBHelperSingleLeavingNode.transientStateEnd,
                                ConsistencyLevel.ONE,
-                               ConsistencyLevel.ALL);
+                               ConsistencyLevel.ALL,
+                               false);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void leavingNodeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void singleLeavingNodeOneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperSingleLeavingNodeFailure.reset();
+        runLeavingTestScenario(cassandraTestContext,
+                               1,
+                               BBHelperSingleLeavingNode::install,
+                               BBHelperSingleLeavingNode.transientStateStart,
+                               BBHelperSingleLeavingNode.transientStateEnd,
+                               ConsistencyLevel.ONE,
+                               ConsistencyLevel.ALL,
+                               true);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    void singleLeavingNodeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleLeavingNode.reset();
         runLeavingTestScenario(cassandraTestContext,
@@ -70,7 +85,22 @@ class LeavingTest extends LeavingBaseTest
                                BBHelperSingleLeavingNode.transientStateStart,
                                BBHelperSingleLeavingNode.transientStateEnd,
                                ConsistencyLevel.QUORUM,
-                               ConsistencyLevel.QUORUM);
+                               ConsistencyLevel.QUORUM,
+                               false);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    void singleLeavingNodeQuorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperSingleLeavingNodeFailure.reset();
+        runLeavingTestScenario(cassandraTestContext,
+                               1,
+                               BBHelperSingleLeavingNode::install,
+                               BBHelperSingleLeavingNode.transientStateStart,
+                               BBHelperSingleLeavingNode.transientStateEnd,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM,
+                               true);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
@@ -83,7 +113,22 @@ class LeavingTest extends LeavingBaseTest
                                BBHelperMultipleLeavingNodes.transientStateStart,
                                BBHelperMultipleLeavingNodes.transientStateEnd,
                                ConsistencyLevel.ONE,
-                               ConsistencyLevel.ALL);
+                               ConsistencyLevel.ALL,
+                               false);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    void multipleLeavingNodesOneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperMultipleLeavingNodesFailure.reset();
+        runLeavingTestScenario(cassandraTestContext,
+                               2,
+                               BBHelperMultipleLeavingNodes::install,
+                               BBHelperMultipleLeavingNodes.transientStateStart,
+                               BBHelperMultipleLeavingNodes.transientStateEnd,
+                               ConsistencyLevel.ONE,
+                               ConsistencyLevel.ALL,
+                               true);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
@@ -96,7 +141,22 @@ class LeavingTest extends LeavingBaseTest
                                BBHelperMultipleLeavingNodes.transientStateStart,
                                BBHelperMultipleLeavingNodes.transientStateEnd,
                                ConsistencyLevel.QUORUM,
-                               ConsistencyLevel.QUORUM);
+                               ConsistencyLevel.QUORUM,
+                               false);
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    void multipleLeavingNodesQuorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperMultipleLeavingNodesFailure.reset();
+        runLeavingTestScenario(cassandraTestContext,
+                               2,
+                               BBHelperMultipleLeavingNodes::install,
+                               BBHelperMultipleLeavingNodes.transientStateStart,
+                               BBHelperMultipleLeavingNodes.transientStateEnd,
+                               ConsistencyLevel.QUORUM,
+                               ConsistencyLevel.QUORUM,
+                               true);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, network = true, gossip = true, buildCluster = false)
@@ -109,7 +169,8 @@ class LeavingTest extends LeavingBaseTest
                                BBHelperHalveClusterSize.transientStateStart,
                                BBHelperHalveClusterSize.transientStateEnd,
                                ConsistencyLevel.ONE,
-                               ConsistencyLevel.ALL);
+                               ConsistencyLevel.ALL,
+                               false);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, network = true, gossip = true, buildCluster = false)
@@ -122,7 +183,8 @@ class LeavingTest extends LeavingBaseTest
                                BBHelperHalveClusterSize.transientStateStart,
                                BBHelperHalveClusterSize.transientStateEnd,
                                ConsistencyLevel.QUORUM,
-                               ConsistencyLevel.QUORUM);
+                               ConsistencyLevel.QUORUM,
+                               false);
     }
 
     void runLeavingTestScenario(ConfigurableCassandraTestContext cassandraTestContext,
@@ -131,7 +193,8 @@ class LeavingTest extends LeavingBaseTest
                                 CountDownLatch transientStateStart,
                                 CountDownLatch transientStateEnd,
                                 ConsistencyLevel readCL,
-                                ConsistencyLevel writeCL)
+                                ConsistencyLevel writeCL,
+                                boolean isFailure)
     throws Exception
     {
 
@@ -150,7 +213,8 @@ class LeavingTest extends LeavingBaseTest
                                transientStateEnd,
                                cluster,
                                readCL,
-                               writeCL);
+                               writeCL,
+                               isFailure);
     }
 
     /**
@@ -196,6 +260,49 @@ class LeavingTest extends LeavingBaseTest
     }
 
     /**
+     * ByteBuddy Helper for a single leaving node failure scenario
+     */
+    @Shared
+    public static class BBHelperSingleLeavingNodeFailure
+    {
+        static CountDownLatch transientStateStart = new CountDownLatch(1);
+        static CountDownLatch transientStateEnd = new CountDownLatch(1);
+
+        public static void install(ClassLoader cl, Integer nodeNumber)
+        {
+            // Test case involves 5 node cluster with 1 leaving node
+            // We intercept the shutdown of the leaving node (5) to validate token ranges
+            if (nodeNumber == 5)
+            {
+                TypePool typePool = TypePool.Default.of(cl);
+                TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
+                                                      .resolve();
+                new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
+                               .method(named("unbootstrap"))
+                               .intercept(MethodDelegation.to(BBHelperSingleLeavingNode.class))
+                               // Defer class loading until all dependencies are loaded
+                               .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
+                               .load(cl, ClassLoadingStrategy.Default.INJECTION);
+            }
+        }
+
+        @SuppressWarnings("unused")
+        public static void unbootstrap(@SuperCall Callable<?> orig) throws Exception
+        {
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            orig.call();
+            throw new UnsupportedOperationException("Simulate leave failure");
+        }
+
+        public static void reset()
+        {
+            transientStateStart = new CountDownLatch(1);
+            transientStateEnd = new CountDownLatch(1);
+        }
+    }
+
+    /**
      * ByteBuddy helper for multiple leaving nodes
      */
     @Shared
@@ -228,6 +335,49 @@ class LeavingTest extends LeavingBaseTest
             transientStateStart.countDown();
             Uninterruptibles.awaitUninterruptibly(transientStateEnd);
             orig.call();
+        }
+
+        public static void reset()
+        {
+            transientStateStart = new CountDownLatch(2);
+            transientStateEnd = new CountDownLatch(2);
+        }
+    }
+
+    /**
+     * ByteBuddy helper for multiple leaving nodes failure scenario
+     */
+    @Shared
+    public static class BBHelperMultipleLeavingNodesFailure
+    {
+        static CountDownLatch transientStateStart = new CountDownLatch(2);
+        static CountDownLatch transientStateEnd = new CountDownLatch(2);
+
+        public static void install(ClassLoader cl, Integer nodeNumber)
+        {
+            // Test case involves 5 node cluster with a 2 leaving nodes
+            // We intercept the shutdown of the leaving nodes (4, 5) to validate token ranges
+            if (nodeNumber > 3)
+            {
+                TypePool typePool = TypePool.Default.of(cl);
+                TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
+                                                      .resolve();
+                new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
+                               .method(named("unbootstrap"))
+                               .intercept(MethodDelegation.to(BBHelperMultipleLeavingNodes.class))
+                               // Defer class loading until all dependencies are loaded
+                               .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
+                               .load(cl, ClassLoadingStrategy.Default.INJECTION);
+            }
+        }
+
+        @SuppressWarnings("unused")
+        public static void unbootstrap(@SuperCall Callable<?> orig) throws Exception
+        {
+            transientStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            orig.call();
+            throw new UnsupportedOperationException("Simulate leave failure");
         }
 
         public static void reset()

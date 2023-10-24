@@ -42,7 +42,8 @@ class LeavingBaseTest extends ResiliencyTestBase
                                 CountDownLatch transientStateEnd,
                                 UpgradeableCluster cluster,
                                 ConsistencyLevel readCL,
-                                ConsistencyLevel writeCL)
+                                ConsistencyLevel writeCL,
+                                boolean isFailure)
     throws Exception
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
@@ -67,11 +68,12 @@ class LeavingBaseTest extends ResiliencyTestBase
                 ClusterUtils.awaitRingState(seed, node, "Leaving");
             }
 
-            table = bulkWriteData(annotation.numDcs() > 1, writeCL);
-
-            Session session = maybeGetSession();
-            assertNotNull(table);
-            validateData(session, table.tableName(), readCL);
+            if (!isFailure) {
+                table = bulkWriteData(annotation.numDcs() > 1, writeCL);
+                Session session = maybeGetSession();
+                assertNotNull(table);
+                validateData(session, table.tableName(), readCL);
+            }
         }
         finally
         {
@@ -79,6 +81,12 @@ class LeavingBaseTest extends ResiliencyTestBase
             {
                 transientStateEnd.countDown();
             }
+        }
+        if (isFailure) {
+            table = bulkWriteData(annotation.numDcs() > 1, writeCL);
+            Session session = maybeGetSession();
+            assertNotNull(table);
+            validateData(session, table.tableName(), readCL);
         }
     }
 }

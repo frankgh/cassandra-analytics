@@ -43,7 +43,7 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 public class HostReplacementMultiDCTest extends HostReplacementBaseTest
 {
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
     void nodeReplacementMultiDCTest(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperNodeReplacementMultiDC.reset();
@@ -60,7 +60,62 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
 
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void nodeReplacementMultiDCEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperNodeReplacementMultiDC.reset();
+
+        runReplacementTest(cassandraTestContext,
+                           BBHelperNodeReplacementMultiDC::install,
+                           BBHelperNodeReplacementMultiDC.transientStateStart,
+                           BBHelperNodeReplacementMultiDC.transientStateEnd,
+                           BBHelperNodeReplacementMultiDC.nodeStart,
+                           true,
+                           false,
+                           ConsistencyLevel.EACH_QUORUM,
+                           ConsistencyLevel.LOCAL_QUORUM);
+
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void nodeReplacementMultiDCQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperNodeReplacementMultiDC.reset();
+
+        runReplacementTest(cassandraTestContext,
+                           BBHelperNodeReplacementMultiDC::install,
+                           BBHelperNodeReplacementMultiDC.transientStateStart,
+                           BBHelperNodeReplacementMultiDC.transientStateEnd,
+                           BBHelperNodeReplacementMultiDC.nodeStart,
+                           true,
+                           false,
+                           ConsistencyLevel.QUORUM,
+                           ConsistencyLevel.QUORUM);
+
+    }
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void nodeReplacementMultiDCAllWriteOneRead(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    {
+        BBHelperNodeReplacementMultiDC.reset();
+
+        runReplacementTest(cassandraTestContext,
+                           BBHelperNodeReplacementMultiDC::install,
+                           BBHelperNodeReplacementMultiDC.transientStateStart,
+                           BBHelperNodeReplacementMultiDC.transientStateEnd,
+                           BBHelperNodeReplacementMultiDC.nodeStart,
+                           true,
+                           false,
+                           ConsistencyLevel.ALL,
+                           ConsistencyLevel.ONE);
+
+    }
+
+    /**
+     * Validates successful write operation when host replacement fails. Also validates that the
+     * node intended to be replaced is 'Down' and the replacement node is not 'Normal'.
+     */
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
     void nodeReplacementFailureMultiDC(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperReplacementFailureMultiDC.reset();
@@ -77,7 +132,13 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
 
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    /**
+     * Validate failed write operation when host replacement fails resulting in insufficient nodes. This is simulated by
+     * bringing down a node in addition to the replacement failure resulting in too few replicas to satisfy the
+     * RF requirements.
+     */
+
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
     void nodeReplacementFailureMultiDCInsufficientNodes(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperNodeReplacementMultiDCInsufficientReplicas.reset();
@@ -87,11 +148,12 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
                            BBHelperNodeReplacementMultiDCInsufficientReplicas.transientStateStart,
                            BBHelperNodeReplacementMultiDCInsufficientReplicas.transientStateEnd,
                            BBHelperNodeReplacementMultiDCInsufficientReplicas.nodeStart,
+                           1,
                            true,
                            true,
                            true,
-                           ConsistencyLevel.LOCAL_QUORUM,
-                           ConsistencyLevel.LOCAL_QUORUM);
+                           ConsistencyLevel.EACH_QUORUM,
+                           ConsistencyLevel.EACH_QUORUM);
 
     }
 
@@ -109,9 +171,9 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
-            // Test case involves 5 node cluster with a replacement node
-            // We intercept the bootstrap of the replacement (6th) node to validate token ranges
-            if (nodeNumber == 6)
+            // Test case involves 10 node cluster (5 per DC) with a replacement node
+            // We intercept the bootstrap of the replacement (11th) node to validate token ranges
+            if (nodeNumber == 7)
             {
                 TypePool typePool = TypePool.Default.of(cl);
                 TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
@@ -159,9 +221,9 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
-            // Test case involves 5 node cluster with a replacement node
-            // We intercept the bootstrap of the replacement (6th) node to validate token ranges
-            if (nodeNumber == 4)
+            // Test case involves 6 node cluster (3 per DC) with a replacement node
+            // We intercept the bootstrap of the replacement (7th) node to validate token ranges
+            if (nodeNumber == 5)
             {
                 TypePool typePool = TypePool.Default.of(cl);
                 TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
@@ -213,7 +275,7 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
         {
             // Test case involves 5 node cluster with a replacement node
             // We intercept the bootstrap of the replacement (6th) node to validate token ranges
-            if (nodeNumber == 6)
+            if (nodeNumber == 11)
             {
                 TypePool typePool = TypePool.Default.of(cl);
                 TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")

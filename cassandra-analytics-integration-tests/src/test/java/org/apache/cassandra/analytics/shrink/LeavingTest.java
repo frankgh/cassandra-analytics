@@ -48,7 +48,7 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 class LeavingTest extends LeavingBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void LeavingNodeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void leavingNodeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleLeavingNode.reset();
         runLeavingTestScenario(cassandraTestContext,
@@ -61,7 +61,7 @@ class LeavingTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void LeavingNodeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void leavingNodeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleLeavingNode.reset();
         runLeavingTestScenario(cassandraTestContext,

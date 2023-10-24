@@ -206,6 +206,7 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         DataFrameWriter<org.apache.spark.sql.Row> dfWriter = df.write()
                                                                .format("org.apache.cassandra.spark.sparksql.CassandraDataSink")
                                                                .option("bulk_writer_cl", writeCL.name())
+                                                               .option("local_dc", "datacenter1")
                                                                .option("sidecar_instances", String.join(",", sidecarInstances))
                                                                .option("sidecar_port", String.valueOf(server.actualPort()))
                                                                .option("keyspace", schema.keyspace())

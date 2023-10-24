@@ -66,6 +66,7 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                            transientStateStart,
                            transientStateEnd,
                            nodeStart,
+                           0,
                            isCrossDCKeyspace,
                            isFailure,
                            false,
@@ -78,6 +79,7 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                             CountDownLatch transientStateStart,
                             CountDownLatch transientStateEnd,
                             CountDownLatch nodeStart,
+                            int additionalNodesToStop,
                             boolean isCrossDCKeyspace,
                             boolean isFailure,
                             boolean shouldWriteFail,
@@ -93,6 +95,8 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
             builder.withInstanceInitializer(instanceInitializer);
             builder.withTokenSupplier(tokenSupplier);
         });
+
+        assertThat(additionalNodesToStop).isLessThan(cluster.size() - 1);
 
         List<IUpgradeableInstance> nodesToRemove = Collections.singletonList(cluster.get(cluster.size()));
         QualifiedTableName schema = null;
@@ -114,8 +118,14 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                                                  .filter(i -> removedNodeAddresses.contains(i.getAddress()))
                                                  .map(ClusterUtils.RingInstanceDetails::getToken)
                                                  .collect(Collectors.toList());
-
             stopNodes(seed, nodesToRemove);
+
+            List<IUpgradeableInstance> additionalRemovalNodes = new ArrayList<>();
+            for (int i = 1; i <= additionalNodesToStop; i++)
+            {
+                additionalRemovalNodes.add(cluster.get(cluster.size() - i));
+            }
+            stopNodes(seed, additionalRemovalNodes);
             newNodes = startReplacementNodes(nodeStart, cluster, nodesToRemove);
 
             // Wait until replacement nodes are in JOINING state
@@ -132,9 +142,10 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                 assertThat(replacementInstance).isPresent();
                 // Verify that replacement node tokens match the removed nodes
                 assertThat(removedNodeTokens).contains(replacementInstance.get().getToken());
+
                 if (shouldWriteFail)
                 {
-                    assertThrows(RuntimeException.class, () -> bulkWriteData(isCrossDCKeyspace, ConsistencyLevel.QUORUM));
+                    assertThrows(RuntimeException.class, () -> bulkWriteData(isCrossDCKeyspace, writeCL));
                 }
                 else
                 {

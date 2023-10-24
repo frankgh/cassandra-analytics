@@ -31,7 +31,6 @@ project(':cassandra-analytics-integration-tests') {
     dependencies {
 
         testImplementation(project(':cassandra-analytics-core'))
-        testImplementation(project(path: ":cassandra-analytics-integration-framework", configuration: "shadow"))
         testImplementation(group: 'net.java.dev.jna', name: 'jna', version: '5.9.0')
 
         testImplementation(group: "${sparkGroupId}", name: "spark-core_${scalaMajorVersion}", version: "${sparkVersion}")
@@ -41,6 +40,7 @@ project(':cassandra-analytics-integration-tests') {
         testImplementation("org.junit.jupiter:junit-jupiter-api:${project.junitVersion}")
         testImplementation("org.junit.jupiter:junit-jupiter-params:${project.junitVersion}")
         testImplementation("org.junit.jupiter:junit-jupiter-engine:${project.junitVersion}")
+        testImplementation(project(path: ":cassandra-analytics-integration-framework", configuration: "shadow"))
         testImplementation(project(':cassandra-analytics-core-example'))
         ext.dtestJar = System.getenv("DTEST_JAR") ?: "dtest-4.1.4.jar" // latest supported Cassandra build is 4.1
         def dtestJarFullPath = "${dependencyLocation}${ext.dtestJar}"
@@ -58,14 +58,10 @@ project(':cassandra-analytics-integration-tests') {
     test {
         // Because system properties aren't passed from the command line through to tests, we need to specifically
         // set them again here.
-//<<<<<<< HEAD
         systemProperty "cassandra.test.dtest_jar_path", dependencyLocation
-//        systemProperty "cassandra.sidecar.versions_to_test", System.getProperty("cassandra.sidecar.versions_to_test", "4.0,4.1")
+        systemProperty "cassandra.sidecar.versions_to_test",
+                System.getProperty("cassandra.sidecar.versions_to_test", "4.0,4.1")
         systemProperty "SKIP_STARTUP_VALIDATIONS", "true"
-//=======
-//        systemProperty "cassandra.test.dtest_jar_path", dtestJarLocation
-////        systemProperty "cassandra.sidecar.versions_to_test", System.getProperty("cassandra.sidecar.versions_to_test")
-//>>>>>>> 802c58f (Update tests to run fast)
         systemProperty "logback.configurationFile", "src/test/resources/logback-test.xml"
         minHeapSize = '1024m'
         maxHeapSize = '3072m'

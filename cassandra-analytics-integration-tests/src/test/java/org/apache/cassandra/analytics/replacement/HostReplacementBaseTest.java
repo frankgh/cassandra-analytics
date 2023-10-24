@@ -51,6 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 public class HostReplacementBaseTest extends ResiliencyTestBase
 {
 
+    // CHECKSTYLE IGNORE: Method with many parameters
     void runReplacementTest(ConfigurableCassandraTestContext cassandraTestContext,
                             BiConsumer<ClassLoader, Integer> instanceInitializer,
                             CountDownLatch transientStateStart,
@@ -74,6 +75,7 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                            writeCL);
     }
 
+    // CHECKSTYLE IGNORE: Method with many parameters
     void runReplacementTest(ConfigurableCassandraTestContext cassandraTestContext,
                             BiConsumer<ClassLoader, Integer> instanceInitializer,
                             CountDownLatch transientStateStart,

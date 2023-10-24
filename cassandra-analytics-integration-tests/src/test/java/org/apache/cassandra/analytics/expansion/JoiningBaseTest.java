@@ -86,7 +86,8 @@ public class JoiningBaseTest extends ResiliencyTestBase
                 ClusterUtils.awaitRingState(seed, newInstance, "Joining");
             }
 
-            if (!isFailure) {
+            if (!isFailure)
+            {
                 table = bulkWriteData(isCrossDCKeyspace, writeCL);
                 Session session = maybeGetSession();
                 assertNotNull(table);
@@ -101,7 +102,8 @@ public class JoiningBaseTest extends ResiliencyTestBase
             }
         }
 
-        if (isFailure) {
+        if (isFailure)
+        {
             table = bulkWriteData(isCrossDCKeyspace, writeCL);
             Session session = maybeGetSession();
             assertNotNull(table);

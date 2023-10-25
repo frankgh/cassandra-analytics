@@ -60,7 +60,7 @@ project(':cassandra-analytics-integration-tests') {
         // set them again here.
         systemProperty "cassandra.test.dtest_jar_path", dependencyLocation
         systemProperty "cassandra.sidecar.versions_to_test",
-                System.getProperty("cassandra.sidecar.versions_to_test", "4.1")
+                System.getProperty("cassandra.sidecar.versions_to_test", "4.0,4.1")
         systemProperty "SKIP_STARTUP_VALIDATIONS", "true"
         systemProperty "logback.configurationFile", "src/test/resources/logback-test.xml"
         minHeapSize = '1024m'

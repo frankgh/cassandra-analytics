@@ -236,10 +236,6 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
                                                                .option("table", schema.tableName())
                                                                .option("number_splits", "-1")
                                                                .mode("append");
-        if (!isCrossDCKeyspace)
-        {
-            dfWriter.option("local_dc", "datacenter1");
-        }
 
         dfWriter.save();
         return schema;

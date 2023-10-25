@@ -23,10 +23,13 @@ import java.math.BigInteger;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Range;
@@ -34,6 +37,7 @@ import com.google.common.collect.RangeMap;
 import com.google.common.collect.TreeRangeMap;
 
 import org.apache.cassandra.spark.common.model.CassandraInstance;
+import org.apache.cassandra.spark.data.ReplicationFactor;
 import org.apache.cassandra.spark.data.partitioner.Partitioner;
 
 public class ReplicaAwareFailureHandler<Instance extends CassandraInstance>
@@ -109,7 +113,9 @@ public class ReplicaAwareFailureHandler<Instance extends CassandraInstance>
                                                                  .filter(inst ->
                                                                          !errorMap.get(inst).isEmpty())
                                                                  .collect(Collectors.toList());
-            if (!cl.checkConsistency(ring, tokenRangeMapping, failedInstances, localDC))
+
+
+            if (!validateConsistency(ring, tokenRangeMapping, failedInstances, cl, localDC))
             {
                 failedEntries.add(new AbstractMap.SimpleEntry<>(failedRangeEntry.getKey(),
                                                                 failedRangeEntry.getValue()));
@@ -119,11 +125,89 @@ public class ReplicaAwareFailureHandler<Instance extends CassandraInstance>
         return failedEntries;
     }
 
+    private boolean validateConsistency(CassandraRing ring,
+                                        TokenRangeMapping<Instance> tokenRangeMapping,
+                                        Collection<Instance> failedInstances,
+                                        ConsistencyLevel cl,
+                                        String localDC)
+    {
+        boolean isConsistencyLevelMet = true;
+
+        Set<String> failedInstanceIPs = failedInstances.stream()
+                                                       .map(CassandraInstance::getIpAddress)
+                                                       .collect(Collectors.toSet());
+        Set<String> datacenters = Collections.emptySet();
+        if (cl == ConsistencyLevel.CL.EACH_QUORUM)
+        {
+            datacenters = ring.getReplicationFactor().getOptions().keySet();
+            Preconditions.checkArgument(ring.getReplicationFactor().getReplicationStrategy() != ReplicationFactor.ReplicationStrategy.SimpleStrategy,
+                                        "EACH_QUORUM doesn't make sense for SimpleStrategy keyspaces");
+
+        }
+
+        if (cl == ConsistencyLevel.CL.LOCAL_QUORUM || cl == ConsistencyLevel.CL.LOCAL_ONE)
+        {
+            datacenters = Collections.singleton(localDC);
+            Preconditions.checkArgument(ring.getReplicationFactor().getReplicationStrategy() != ReplicationFactor.ReplicationStrategy.SimpleStrategy,
+                                        cl + " doesn't make sense for SimpleStrategy keyspaces");
+
+        }
+
+        if (!datacenters.isEmpty())
+        {
+            for (String dc: datacenters)
+            {
+                Set<String> failedIpsPerDC = failedInstances.stream()
+                                                            .filter(inst -> inst.getDataCenter().matches(dc))
+                                                            .map(CassandraInstance::getIpAddress)
+                                                            .collect(Collectors.toSet());
+
+                Set<String> dcWriteReplicas = maybeUpdateWriteReplicasForReplacements(tokenRangeMapping.getWriteReplicas(dc),
+                                                                                      tokenRangeMapping.getReplacementInstances(dc),
+                                                                                      failedIpsPerDC);
+
+                isConsistencyLevelMet = isConsistencyLevelMet &&
+                                        cl.checkConsistency(dcWriteReplicas,
+                                                            tokenRangeMapping.getPendingReplicas(dc),
+                                                            tokenRangeMapping.getReplacementInstances(dc),
+                                                            tokenRangeMapping.getBlockedInstances(dc),
+                                                            failedIpsPerDC,
+                                                            localDC);
+            }
+        }
+        else
+        {
+            Set<String> replacementInstances = tokenRangeMapping.getReplacementInstances();
+            Set<String> dcWriteReplicas = maybeUpdateWriteReplicasForReplacements(tokenRangeMapping.getWriteReplicas(),
+                                                                                  replacementInstances,
+                                                                                  failedInstanceIPs);
+
+            isConsistencyLevelMet = cl.checkConsistency(dcWriteReplicas,
+                                                        tokenRangeMapping.getPendingReplicas(),
+                                                        replacementInstances,
+                                                        tokenRangeMapping.getBlockedInstances(),
+                                                        failedInstanceIPs,
+                                                        localDC);
+        }
+        return isConsistencyLevelMet;
+    }
+
     public boolean hasFailed(final CassandraRing ring,
                              final TokenRangeMapping<Instance> tokenRange,
                              final ConsistencyLevel cl,
                              final String localDC)
     {
         return !getFailedEntries(ring, tokenRange, cl, localDC).isEmpty();
+    }
+
+    private static Set<String> maybeUpdateWriteReplicasForReplacements(Set<String> writeReplicas, Set<String> replacingInstances, Set<String> failedInstances)
+    {
+        // Exclude replacement nodes from write-replicas if replacements are NOT among failed instances
+        if (!replacingInstances.isEmpty() && Collections.disjoint(failedInstances, replacingInstances))
+        {
+
+            return writeReplicas.stream().filter(r -> !replacingInstances.contains(r)).collect(Collectors.toSet());
+        }
+        return writeReplicas;
     }
 }

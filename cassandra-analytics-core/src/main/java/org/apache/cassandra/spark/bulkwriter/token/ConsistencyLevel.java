@@ -19,18 +19,10 @@
 
 package org.apache.cassandra.spark.bulkwriter.token;
 
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Set;
-import java.util.stream.Collectors;
-
-import com.google.common.base.Preconditions;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.cassandra.spark.common.model.CassandraInstance;
-import org.apache.cassandra.spark.data.ReplicationFactor;
 
 public interface ConsistencyLevel
 {
@@ -51,9 +43,11 @@ public interface ConsistencyLevel
      *   This is to ensure that we are writing to sufficient non-replacement nodes as replacements can potentially fail leaving us with fewer nodes.
      * </pre>
      */
-    boolean checkConsistency(CassandraRing ring,
-                             TokenRangeMapping<? extends CassandraInstance> tokenRangeMapping,
-                             Collection<? extends CassandraInstance> failedInsts,
+    boolean checkConsistency(Set<String> writeReplicas,
+                             Set<String> pendingReplicas,
+                             Set<String> replacementInstances,
+                             Set<String> blockedInstances,
+                             Set<String> failedInstanceIps,
                              String localDC);
 
     // Check if successful writes forms quorum of non-replacing nodes - N/A as quorum is if there are no failures/blocked
@@ -68,13 +62,15 @@ public interface ConsistencyLevel
             }
 
             @Override
-            public boolean checkConsistency(final CassandraRing ring,
-                                            final TokenRangeMapping<? extends CassandraInstance> tokenRangeMapping,
-                                            final Collection<? extends CassandraInstance> failedInsts,
-                                            final String localDC)
+            public boolean checkConsistency(Set<String> writeReplicas,
+                                            Set<String> pendingReplicas,
+                                            Set<String> replacementInstances,
+                                            Set<String> blockedInstances,
+                                            Set<String> failedInstanceIps,
+                                            String localDC)
             {
-                int failedExcludingReplacements = failedInsts.size() - tokenRangeMapping.getReplacementInstances().size();
-                return failedExcludingReplacements <= 0 && tokenRangeMapping.getBlockedInstances().isEmpty();
+                int failedExcludingReplacements = failedInstanceIps.size() - replacementInstances.size();
+                return failedExcludingReplacements <= 0 && blockedInstances.isEmpty();
             }
         },
 
@@ -87,35 +83,14 @@ public interface ConsistencyLevel
             }
 
             @Override
-            public boolean checkConsistency(final CassandraRing ring,
-                                            final TokenRangeMapping<? extends CassandraInstance> tokenRangeMapping,
-                                            final Collection<? extends CassandraInstance> failedInsts,
-                                            final String localDC)
+            public boolean checkConsistency(Set<String> writeReplicas,
+                                            Set<String> pendingReplicas,
+                                            Set<String> replacementInstances,
+                                            Set<String> blockedInstances,
+                                            Set<String> failedInstanceIps,
+                                            String localDC)
             {
-                Preconditions.checkArgument(ring.getReplicationFactor().getReplicationStrategy() != ReplicationFactor.ReplicationStrategy.SimpleStrategy,
-                                            "EACH_QUORUM doesn't make sense for SimpleStrategy keyspaces");
-
-                for (final String dataCenter : ring.getReplicationFactor().getOptions().keySet())
-                {
-                    Set<String> dcReplacingInstances = tokenRangeMapping.getReplacementInstances(dataCenter);
-                    Set<String> dcFailedInstances = failedInsts.stream()
-                                                               .filter(inst -> inst.getDataCenter().matches(dataCenter))
-                                                               .map(CassandraInstance::getIpAddress)
-                                                               .collect(Collectors.toSet());
-
-                    final long dcWriteReplicaCount = maybeUpdateWriteReplicasForReplacements(tokenRangeMapping.getWriteReplicas(dataCenter),
-                                                                                             dcReplacingInstances,
-                                                                                             dcFailedInstances);
-
-                    long dcBlockedInstancesCount = tokenRangeMapping.getBlockedInstances(dataCenter).size();
-
-                    if ((dcFailedInstances.size() + dcBlockedInstancesCount) > (dcWriteReplicaCount - (dcWriteReplicaCount / 2 + 1)))
-                    {
-                        return false;
-                    }
-                }
-
-                return true;
+                return (failedInstanceIps.size() + blockedInstances.size()) <= (writeReplicas.size() - (writeReplicas.size() / 2 + 1));
             }
         },
         QUORUM
@@ -128,17 +103,14 @@ public interface ConsistencyLevel
             }
 
             @Override
-            public boolean checkConsistency(final CassandraRing ring,
-                                            final TokenRangeMapping<? extends CassandraInstance> tokenRangeMapping,
-                                            final Collection<? extends CassandraInstance> failedInsts,
-                                            final String localDC)
+            public boolean checkConsistency(Set<String> writeReplicas,
+                                            Set<String> pendingReplicas,
+                                            Set<String> replacementInstances,
+                                            Set<String> blockedInstances,
+                                            Set<String> failedInstanceIps,
+                                            String localDC)
             {
-                Set<String> replacingInstances = tokenRangeMapping.getReplacementInstances();
-                Set<String> failedInstanceIPs = failedInsts.stream().map(CassandraInstance::getIpAddress).collect(Collectors.toSet());
-                final long writeReplicaCount = maybeUpdateWriteReplicasForReplacements(tokenRangeMapping.getWriteReplicas(),
-                                                                                       replacingInstances,
-                                                                                       failedInstanceIPs);
-                return (failedInsts.size() + tokenRangeMapping.getBlockedInstances().size()) <= (writeReplicaCount - (writeReplicaCount / 2 + 1));
+                return (failedInstanceIps.size() + blockedInstances.size()) <= (writeReplicas.size() - (writeReplicas.size() / 2 + 1));
             }
         },
         LOCAL_QUORUM
@@ -150,26 +122,14 @@ public interface ConsistencyLevel
             }
 
             @Override
-            public boolean checkConsistency(final CassandraRing ring,
-                                            final TokenRangeMapping<? extends CassandraInstance> tokenRangeMapping,
-                                            final Collection<? extends CassandraInstance> failedInsts,
-                                            final String localDC)
+            public boolean checkConsistency(Set<String> writeReplicas,
+                                            Set<String> pendingReplicas,
+                                            Set<String> replacementInstances,
+                                            Set<String> blockedInstances,
+                                            Set<String> failedInstanceIps,
+                                            String localDC)
             {
-                Preconditions.checkArgument(ring.getReplicationFactor().getReplicationStrategy() != ReplicationFactor.ReplicationStrategy.SimpleStrategy,
-                                            "LOCAL_QUORUM doesn't make sense for SimpleStrategy keyspaces");
-
-                Set<String> dcFailedInstances = failedInsts.stream()
-                                                           .filter(inst -> inst.getDataCenter().matches(localDC))
-                                                           .map(CassandraInstance::getIpAddress)
-                                                           .collect(Collectors.toSet());
-
-                long dcBlockedInstancesCount = tokenRangeMapping.getBlockedInstances(localDC).size();
-
-                Set<String> dcReplacingInstances = tokenRangeMapping.getReplacementInstances(localDC);
-                final long dcWriteReplicaCount = maybeUpdateWriteReplicasForReplacements(tokenRangeMapping.getWriteReplicas(localDC),
-                                                                                         dcReplacingInstances,
-                                                                                         dcFailedInstances);
-                return (dcFailedInstances.size() + dcBlockedInstancesCount) <= (dcWriteReplicaCount - (dcWriteReplicaCount / 2 + 1));
+                return (failedInstanceIps.size() + blockedInstances.size()) <= (writeReplicas.size() - (writeReplicas.size() / 2 + 1));
             }
         },
         ONE
@@ -181,20 +141,15 @@ public interface ConsistencyLevel
             }
 
             @Override
-            public boolean checkConsistency(final CassandraRing ring,
-                                            final TokenRangeMapping<? extends CassandraInstance> tokenRangeMapping,
-                                            final Collection<? extends CassandraInstance> failedInsts,
-                                            final String localDC)
+            public boolean checkConsistency(Set<String> writeReplicas,
+                                            Set<String> pendingReplicas,
+                                            Set<String> replacementInstances,
+                                            Set<String> blockedInstances,
+                                            Set<String> failedInstanceIps,
+                                            String localDC)
             {
-                Set<String> replacingInstances = tokenRangeMapping.getReplacementInstances();
-
-                Set<String> failedInstanceIPs = failedInsts.stream().map(CassandraInstance::getIpAddress).collect(Collectors.toSet());
-
-                final long writeReplicaCount = maybeUpdateWriteReplicasForReplacements(tokenRangeMapping.getWriteReplicas(),
-                                                                                       replacingInstances,
-                                                                                       failedInstanceIPs);
-                return (failedInsts.size() + tokenRangeMapping.getBlockedInstances().size())
-                       <= (writeReplicaCount - tokenRangeMapping.getPendingReplicas().size() - 1);
+                return (failedInstanceIps.size() + blockedInstances.size())
+                       <= (writeReplicas.size() - pendingReplicas.size() - 1);
             }
         },
         TWO
@@ -206,19 +161,15 @@ public interface ConsistencyLevel
             }
 
             @Override
-            public boolean checkConsistency(final CassandraRing ring,
-                                            final TokenRangeMapping<? extends CassandraInstance> tokenRangeMapping,
-                                            final Collection<? extends CassandraInstance> failedInsts,
-                                            final String localDC)
+            public boolean checkConsistency(Set<String> writeReplicas,
+                                            Set<String> pendingReplicas,
+                                            Set<String> replacementInstances,
+                                            Set<String> blockedInstances,
+                                            Set<String> failedInstanceIps,
+                                            String localDC)
             {
-                Set<String> replacingInstances = tokenRangeMapping.getReplacementInstances();
-                Set<String> failedInstanceIPs = failedInsts.stream().map(CassandraInstance::getIpAddress).collect(Collectors.toSet());
-
-                final long writeReplicaCount = maybeUpdateWriteReplicasForReplacements(tokenRangeMapping.getWriteReplicas(),
-                                                                                       replacingInstances,
-                                                                                       failedInstanceIPs);
-                return (failedInsts.size() + tokenRangeMapping.getBlockedInstances().size())
-                       <= (writeReplicaCount - tokenRangeMapping.getPendingReplicas().size() - 2);
+                return (failedInstanceIps.size() + blockedInstances.size())
+                       <= (writeReplicas.size() - pendingReplicas.size() - 2);
             }
         },
         LOCAL_ONE
@@ -230,37 +181,15 @@ public interface ConsistencyLevel
             }
 
             @Override
-            public boolean checkConsistency(final CassandraRing ring,
-                                            final TokenRangeMapping<? extends CassandraInstance> tokenRangeMapping,
-                                            final Collection<? extends CassandraInstance> failedInsts,
-                                            final String localDC)
+            public boolean checkConsistency(Set<String> writeReplicas,
+                                            Set<String> pendingReplicas,
+                                            Set<String> replacementInstances,
+                                            Set<String> blockedInstances,
+                                            Set<String> failedInstanceIps,
+                                            String localDC)
             {
-                Preconditions.checkArgument(ring.getReplicationFactor().getReplicationStrategy() != ReplicationFactor.ReplicationStrategy.SimpleStrategy,
-                                            "LOCAL_QUORUM doesn't make sense for SimpleStrategy keyspaces");
-
-                Set<String> dcFailedInstances = failedInsts.stream()
-                                                           .filter(inst -> inst.getDataCenter().matches(localDC))
-                                                           .map(CassandraInstance::getIpAddress)
-                                                           .collect(Collectors.toSet());
-                long dcBlockedInstancesCount = tokenRangeMapping.getBlockedInstances(localDC).size();
-                Set<String> dcReplacingInstances = tokenRangeMapping.getReplacementInstances(localDC);
-                // TODO: Ensure quorum in non-pending replica-set while writing
-                final long dcWriteReplicaCount = maybeUpdateWriteReplicasForReplacements(tokenRangeMapping.getWriteReplicas(localDC),
-                                                                                         dcReplacingInstances,
-                                                                                         dcFailedInstances);
-                return (dcFailedInstances.size() + dcBlockedInstancesCount) <= (dcWriteReplicaCount - tokenRangeMapping.getPendingReplicas(localDC).size() - 1);
+                return (failedInstanceIps.size() + blockedInstances.size()) <= (writeReplicas.size() - pendingReplicas.size() - 1);
             }
         };
-
-        private static long maybeUpdateWriteReplicasForReplacements(Set<String> writeReplicas, Set<String> replacingInstances, Set<String> failedInstances)
-        {
-            // Exclude replacement nodes from write-replicas if replacements are NOT among failed instances
-            if (!replacingInstances.isEmpty() && Collections.disjoint(failedInstances, replacingInstances))
-            {
-
-                return writeReplicas.stream().filter(r -> !replacingInstances.contains(r)).count();
-            }
-            return writeReplicas.size();
-        }
     }
 }

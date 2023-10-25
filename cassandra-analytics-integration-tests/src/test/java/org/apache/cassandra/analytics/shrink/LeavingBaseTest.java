@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
@@ -32,6 +33,11 @@ import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.IUpgradeableInstance;
 import org.apache.cassandra.distributed.shared.ClusterUtils;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
+import org.apache.spark.SparkConf;
+import org.apache.spark.sql.DataFrameWriter;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
 
 import static org.junit.Assert.assertNotNull;
 
@@ -77,17 +83,66 @@ class LeavingBaseTest extends ResiliencyTestBase
         }
         finally
         {
-            for (int i = 0; i < leavingNodesPerDC; i++)
+            if (!isFailure)
             {
-                transientStateEnd.countDown();
+                for (int i = 0; i < leavingNodesPerDC; i++)
+                {
+                    transientStateEnd.countDown();
+                }
             }
         }
         if (isFailure)
         {
-            table = bulkWriteData(annotation.numDcs() > 1, writeCL);
+            table = bulkWriteData(annotation.numDcs() > 1, writeCL, leavingNodesPerDC, transientStateEnd);
             Session session = maybeGetSession();
             assertNotNull(table);
             validateData(session, table.tableName(), readCL);
+            // TODO: node normal state
+            // TODO: transient node got the data
         }
+    }
+
+    protected QualifiedTableName bulkWriteData(boolean isCrossDCKeyspace, ConsistencyLevel writeCL, int leavingNodesPerDC, CountDownLatch transientStateEnd)
+    {
+        CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
+        List<String> sidecarInstances = generateSidecarInstances((annotation.nodesPerDc() + annotation.newNodesPerDc()) * annotation.numDcs());
+
+        ImmutableMap<String, Integer> rf;
+        if (annotation.numDcs() > 1 && isCrossDCKeyspace)
+        {
+            rf = ImmutableMap.of("datacenter1", DEFAULT_RF, "datacenter2", DEFAULT_RF);
+        }
+        else
+        {
+            rf = ImmutableMap.of("datacenter1", DEFAULT_RF);
+        }
+
+        QualifiedTableName schema = initializeSchema(rf);
+
+        SparkConf sparkConf = generateSparkConf();
+        SparkSession spark = generateSparkSession(sparkConf);
+        Dataset<Row> df = generateData(spark);
+
+        DataFrameWriter<Row> dfWriter = df.write()
+                                          .format("org.apache.cassandra.spark.sparksql.CassandraDataSink")
+                                          .option("bulk_writer_cl", writeCL.name())
+                                          .option("local_dc", "datacenter1")
+                                          .option("sidecar_instances", String.join(",", sidecarInstances))
+                                          .option("sidecar_port", String.valueOf(server.actualPort()))
+                                          .option("keyspace", schema.keyspace())
+                                          .option("table", schema.tableName())
+                                          .option("number_splits", "-1")
+                                          .mode("append");
+        if (!isCrossDCKeyspace)
+        {
+            dfWriter.option("local_dc", "datacenter1");
+        }
+
+        for (int i = 0; i < leavingNodesPerDC; i++)
+        {
+            transientStateEnd.countDown();
+        }
+        dfWriter.save();
+        return schema;
     }
 }

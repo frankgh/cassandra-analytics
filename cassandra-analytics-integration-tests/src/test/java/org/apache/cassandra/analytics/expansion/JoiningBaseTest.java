@@ -24,6 +24,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
@@ -38,6 +39,11 @@ import org.apache.cassandra.distributed.api.TokenSupplier;
 import org.apache.cassandra.distributed.shared.ClusterUtils;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
+import org.apache.spark.SparkConf;
+import org.apache.spark.sql.DataFrameWriter;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
 
 import static junit.framework.TestCase.assertNotNull;
 
@@ -96,18 +102,23 @@ public class JoiningBaseTest extends ResiliencyTestBase
         }
         finally
         {
-            for (int i = 0; i < (annotation.newNodesPerDc() * annotation.numDcs()); i++)
+            if (!isFailure)
             {
-                transientStateEnd.countDown();
+                for (int i = 0; i < (annotation.newNodesPerDc() * annotation.numDcs()); i++)
+                {
+                    transientStateEnd.countDown();
+                }
             }
         }
 
         if (isFailure)
         {
-            table = bulkWriteData(isCrossDCKeyspace, writeCL);
+            table = bulkWriteData(isCrossDCKeyspace, writeCL, transientStateEnd);
             Session session = maybeGetSession();
             assertNotNull(table);
             validateData(session, table.tableName(), readCL);
+            // TODO: join node not part of cluster
+            // TODO: transient join node to have the data ?
         }
     }
 
@@ -139,5 +150,49 @@ public class JoiningBaseTest extends ResiliencyTestBase
                                readCL,
                                writeCL,
                                isFailure);
+    }
+
+    protected QualifiedTableName bulkWriteData(boolean isCrossDCKeyspace, ConsistencyLevel writeCL, CountDownLatch transientStateEnd)
+    {
+        CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
+        List<String> sidecarInstances = generateSidecarInstances((annotation.nodesPerDc() + annotation.newNodesPerDc()) * annotation.numDcs());
+
+        ImmutableMap<String, Integer> rf;
+        if (annotation.numDcs() > 1 && isCrossDCKeyspace)
+        {
+            rf = ImmutableMap.of("datacenter1", DEFAULT_RF, "datacenter2", DEFAULT_RF);
+        }
+        else
+        {
+            rf = ImmutableMap.of("datacenter1", DEFAULT_RF);
+        }
+
+        QualifiedTableName schema = initializeSchema(rf);
+
+        SparkConf sparkConf = generateSparkConf();
+        SparkSession spark = generateSparkSession(sparkConf);
+        Dataset<Row> df = generateData(spark);
+
+        DataFrameWriter<Row> dfWriter = df.write()
+                                          .format("org.apache.cassandra.spark.sparksql.CassandraDataSink")
+                                          .option("bulk_writer_cl", writeCL.name())
+                                          .option("local_dc", "datacenter1")
+                                          .option("sidecar_instances", String.join(",", sidecarInstances))
+                                          .option("sidecar_port", String.valueOf(server.actualPort()))
+                                          .option("keyspace", schema.keyspace())
+                                          .option("table", schema.tableName())
+                                          .option("number_splits", "-1")
+                                          .mode("append");
+        if (!isCrossDCKeyspace)
+        {
+            dfWriter.option("local_dc", "datacenter1");
+        }
+
+        for (int i = 0; i < (annotation.newNodesPerDc() * annotation.numDcs()); i++)
+        {
+            transientStateEnd.countDown();
+        }
+        dfWriter.save();
+        return schema;
     }
 }

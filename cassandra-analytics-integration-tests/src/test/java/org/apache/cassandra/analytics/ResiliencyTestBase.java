@@ -250,7 +250,7 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         return bulkWriteData(false, writeCL);
     }
 
-    List<String> generateSidecarInstances(int numNodes)
+    protected List<String> generateSidecarInstances(int numNodes)
     {
         List<String> sidecarInstances = new ArrayList<>();
         sidecarInstances.add("localhost");

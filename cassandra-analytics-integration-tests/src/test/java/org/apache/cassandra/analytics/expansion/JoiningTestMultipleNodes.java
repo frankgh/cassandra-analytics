@@ -65,9 +65,9 @@ public class JoiningTestMultipleNodes extends JoiningBaseTest
     {
         BBHelperMultipleJoiningNodesFailure.reset();
         runJoiningTestScenario(cassandraTestContext,
-                               BBHelperMultipleJoiningNodes::install,
-                               BBHelperMultipleJoiningNodes.transientStateStart,
-                               BBHelperMultipleJoiningNodes.transientStateEnd,
+                               BBHelperMultipleJoiningNodesFailure::install,
+                               BBHelperMultipleJoiningNodesFailure.transientStateStart,
+                               BBHelperMultipleJoiningNodesFailure.transientStateEnd,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
                                true);
@@ -93,9 +93,9 @@ public class JoiningTestMultipleNodes extends JoiningBaseTest
     {
         BBHelperMultipleJoiningNodesFailure.reset();
         runJoiningTestScenario(cassandraTestContext,
-                               BBHelperMultipleJoiningNodes::install,
-                               BBHelperMultipleJoiningNodes.transientStateStart,
-                               BBHelperMultipleJoiningNodes.transientStateEnd,
+                               BBHelperMultipleJoiningNodesFailure::install,
+                               BBHelperMultipleJoiningNodesFailure.transientStateStart,
+                               BBHelperMultipleJoiningNodesFailure.transientStateEnd,
                                ConsistencyLevel.QUORUM,
                                ConsistencyLevel.QUORUM,
                                true);
@@ -166,7 +166,7 @@ public class JoiningTestMultipleNodes extends JoiningBaseTest
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
                                .method(named("bootstrap").and(takesArguments(2)))
-                               .intercept(MethodDelegation.to(BBHelperMultipleJoiningNodes.class))
+                               .intercept(MethodDelegation.to(BBHelperMultipleJoiningNodesFailure.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);

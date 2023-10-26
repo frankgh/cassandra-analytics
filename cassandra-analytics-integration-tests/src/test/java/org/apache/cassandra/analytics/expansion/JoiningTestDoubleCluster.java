@@ -63,9 +63,9 @@ public class JoiningTestDoubleCluster extends JoiningBaseTest
     {
         BBHelperDoubleClusterSizeFailure.reset();
         runJoiningTestScenario(cassandraTestContext,
-                               BBHelperDoubleClusterSize::install,
-                               BBHelperDoubleClusterSize.transientStateStart,
-                               BBHelperDoubleClusterSize.transientStateEnd,
+                               BBHelperDoubleClusterSizeFailure::install,
+                               BBHelperDoubleClusterSizeFailure.transientStateStart,
+                               BBHelperDoubleClusterSizeFailure.transientStateEnd,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
                                true);
@@ -89,9 +89,9 @@ public class JoiningTestDoubleCluster extends JoiningBaseTest
     {
         BBHelperDoubleClusterSizeFailure.reset();
         runJoiningTestScenario(cassandraTestContext,
-                               BBHelperDoubleClusterSize::install,
-                               BBHelperDoubleClusterSize.transientStateStart,
-                               BBHelperDoubleClusterSize.transientStateEnd,
+                               BBHelperDoubleClusterSizeFailure::install,
+                               BBHelperDoubleClusterSizeFailure.transientStateStart,
+                               BBHelperDoubleClusterSizeFailure.transientStateEnd,
                                ConsistencyLevel.QUORUM,
                                ConsistencyLevel.QUORUM,
                                true);
@@ -162,7 +162,7 @@ public class JoiningTestDoubleCluster extends JoiningBaseTest
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
                                .method(named("bootstrap").and(takesArguments(2)))
-                               .intercept(MethodDelegation.to(BBHelperDoubleClusterSize.class))
+                               .intercept(MethodDelegation.to(BBHelperDoubleClusterSizeFailure.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);

@@ -64,9 +64,9 @@ class LeavingTest extends LeavingBaseTest
         BBHelperSingleLeavingNodeFailure.reset();
         runLeavingTestScenario(cassandraTestContext,
                                1,
-                               BBHelperSingleLeavingNode::install,
-                               BBHelperSingleLeavingNode.transientStateStart,
-                               BBHelperSingleLeavingNode.transientStateEnd,
+                               BBHelperSingleLeavingNodeFailure::install,
+                               BBHelperSingleLeavingNodeFailure.transientStateStart,
+                               BBHelperSingleLeavingNodeFailure.transientStateEnd,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
                                true);
@@ -92,9 +92,9 @@ class LeavingTest extends LeavingBaseTest
         BBHelperSingleLeavingNodeFailure.reset();
         runLeavingTestScenario(cassandraTestContext,
                                1,
-                               BBHelperSingleLeavingNode::install,
-                               BBHelperSingleLeavingNode.transientStateStart,
-                               BBHelperSingleLeavingNode.transientStateEnd,
+                               BBHelperSingleLeavingNodeFailure::install,
+                               BBHelperSingleLeavingNodeFailure.transientStateStart,
+                               BBHelperSingleLeavingNodeFailure.transientStateEnd,
                                ConsistencyLevel.QUORUM,
                                ConsistencyLevel.QUORUM,
                                true);
@@ -120,9 +120,9 @@ class LeavingTest extends LeavingBaseTest
         BBHelperMultipleLeavingNodesFailure.reset();
         runLeavingTestScenario(cassandraTestContext,
                                2,
-                               BBHelperMultipleLeavingNodes::install,
-                               BBHelperMultipleLeavingNodes.transientStateStart,
-                               BBHelperMultipleLeavingNodes.transientStateEnd,
+                               BBHelperMultipleLeavingNodesFailure::install,
+                               BBHelperMultipleLeavingNodesFailure.transientStateStart,
+                               BBHelperMultipleLeavingNodesFailure.transientStateEnd,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
                                true);
@@ -148,9 +148,9 @@ class LeavingTest extends LeavingBaseTest
         BBHelperMultipleLeavingNodesFailure.reset();
         runLeavingTestScenario(cassandraTestContext,
                                2,
-                               BBHelperMultipleLeavingNodes::install,
-                               BBHelperMultipleLeavingNodes.transientStateStart,
-                               BBHelperMultipleLeavingNodes.transientStateEnd,
+                               BBHelperMultipleLeavingNodesFailure::install,
+                               BBHelperMultipleLeavingNodesFailure.transientStateStart,
+                               BBHelperMultipleLeavingNodesFailure.transientStateEnd,
                                ConsistencyLevel.QUORUM,
                                ConsistencyLevel.QUORUM,
                                true);
@@ -276,7 +276,7 @@ class LeavingTest extends LeavingBaseTest
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
                                .method(named("unbootstrap"))
-                               .intercept(MethodDelegation.to(BBHelperSingleLeavingNode.class))
+                               .intercept(MethodDelegation.to(BBHelperSingleLeavingNodeFailure.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);
@@ -361,7 +361,7 @@ class LeavingTest extends LeavingBaseTest
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
                                .method(named("unbootstrap"))
-                               .intercept(MethodDelegation.to(BBHelperMultipleLeavingNodes.class))
+                               .intercept(MethodDelegation.to(BBHelperMultipleLeavingNodesFailure.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);

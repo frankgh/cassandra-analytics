@@ -60,9 +60,9 @@ public class JoiningTestSingleNode extends JoiningBaseTest
     {
         BBHelperSingleJoiningNodeFailure.reset();
         runJoiningTestScenario(cassandraTestContext,
-                               BBHelperSingleJoiningNode::install,
-                               BBHelperSingleJoiningNode.transientStateStart,
-                               BBHelperSingleJoiningNode.transientStateEnd,
+                               BBHelperSingleJoiningNodeFailure::install,
+                               BBHelperSingleJoiningNodeFailure.transientStateStart,
+                               BBHelperSingleJoiningNodeFailure.transientStateEnd,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
                                true);
@@ -86,9 +86,9 @@ public class JoiningTestSingleNode extends JoiningBaseTest
     {
         BBHelperSingleJoiningNodeFailure.reset();
         runJoiningTestScenario(cassandraTestContext,
-                               BBHelperSingleJoiningNode::install,
-                               BBHelperSingleJoiningNode.transientStateStart,
-                               BBHelperSingleJoiningNode.transientStateEnd,
+                               BBHelperSingleJoiningNodeFailure::install,
+                               BBHelperSingleJoiningNodeFailure.transientStateStart,
+                               BBHelperSingleJoiningNodeFailure.transientStateEnd,
                                ConsistencyLevel.QUORUM,
                                ConsistencyLevel.QUORUM,
                                true);
@@ -159,7 +159,7 @@ public class JoiningTestSingleNode extends JoiningBaseTest
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
                                .method(named("bootstrap").and(takesArguments(2)))
-                               .intercept(MethodDelegation.to(BBHelperSingleJoiningNode.class))
+                               .intercept(MethodDelegation.to(BBHelperSingleJoiningNodeFailure.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);

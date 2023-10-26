@@ -70,8 +70,8 @@ class LeavingTestMultiDC extends LeavingBaseTest
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperLeavingNodesMultiDCFailure::install, cassandraTestContext);
 
         runLeavingTestScenario(leavingNodesPerDC,
-                               BBHelperLeavingNodesMultiDC.transientStateStart,
-                               BBHelperLeavingNodesMultiDC.transientStateEnd,
+                               BBHelperLeavingNodesMultiDCFailure.transientStateStart,
+                               BBHelperLeavingNodesMultiDCFailure.transientStateEnd,
                                cluster,
                                ConsistencyLevel.ALL,
                                ConsistencyLevel.ONE,
@@ -104,8 +104,8 @@ class LeavingTestMultiDC extends LeavingBaseTest
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperLeavingNodesMultiDCFailure::install, cassandraTestContext);
 
         runLeavingTestScenario(leavingNodesPerDC,
-                               BBHelperLeavingNodesMultiDC.transientStateStart,
-                               BBHelperLeavingNodesMultiDC.transientStateEnd,
+                               BBHelperLeavingNodesMultiDCFailure.transientStateStart,
+                               BBHelperLeavingNodesMultiDCFailure.transientStateEnd,
                                cluster,
                                ConsistencyLevel.LOCAL_QUORUM,
                                ConsistencyLevel.LOCAL_QUORUM,
@@ -138,8 +138,8 @@ class LeavingTestMultiDC extends LeavingBaseTest
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperLeavingNodesMultiDCFailure::install, cassandraTestContext);
 
         runLeavingTestScenario(leavingNodesPerDC,
-                               BBHelperLeavingNodesMultiDC.transientStateStart,
-                               BBHelperLeavingNodesMultiDC.transientStateEnd,
+                               BBHelperLeavingNodesMultiDCFailure.transientStateStart,
+                               BBHelperLeavingNodesMultiDCFailure.transientStateEnd,
                                cluster,
                                ConsistencyLevel.LOCAL_QUORUM,
                                ConsistencyLevel.EACH_QUORUM,
@@ -172,8 +172,8 @@ class LeavingTestMultiDC extends LeavingBaseTest
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperLeavingNodesMultiDCFailure::install, cassandraTestContext);
 
         runLeavingTestScenario(leavingNodesPerDC,
-                               BBHelperLeavingNodesMultiDC.transientStateStart,
-                               BBHelperLeavingNodesMultiDC.transientStateEnd,
+                               BBHelperLeavingNodesMultiDCFailure.transientStateStart,
+                               BBHelperLeavingNodesMultiDCFailure.transientStateEnd,
                                cluster,
                                ConsistencyLevel.QUORUM,
                                ConsistencyLevel.QUORUM,
@@ -206,8 +206,8 @@ class LeavingTestMultiDC extends LeavingBaseTest
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperLeavingNodesMultiDCFailure::install, cassandraTestContext);
 
         runLeavingTestScenario(leavingNodesPerDC,
-                               BBHelperLeavingNodesMultiDC.transientStateStart,
-                               BBHelperLeavingNodesMultiDC.transientStateEnd,
+                               BBHelperLeavingNodesMultiDCFailure.transientStateStart,
+                               BBHelperLeavingNodesMultiDCFailure.transientStateEnd,
                                cluster,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
@@ -276,7 +276,7 @@ class LeavingTestMultiDC extends LeavingBaseTest
                                                       .resolve();
                 new ByteBuddy().rebase(description, ClassFileLocator.ForClassLoader.of(cl))
                                .method(named("unbootstrap"))
-                               .intercept(MethodDelegation.to(BBHelperLeavingNodesMultiDC.class))
+                               .intercept(MethodDelegation.to(BBHelperLeavingNodesMultiDCFailure.class))
                                // Defer class loading until all dependencies are loaded
                                .make(TypeResolutionStrategy.Lazy.INSTANCE, typePool)
                                .load(cl, ClassLoadingStrategy.Default.INJECTION);

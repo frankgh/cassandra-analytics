@@ -41,7 +41,6 @@ import com.google.common.collect.TreeRangeSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.cassandra.spark.bulkwriter.token.CassandraRing;
 import org.apache.cassandra.spark.bulkwriter.token.RangeUtils;
 import org.apache.cassandra.spark.bulkwriter.token.TokenRangeMapping;
 import org.apache.spark.Partitioner;
@@ -49,34 +48,31 @@ import org.apache.spark.Partitioner;
 public class TokenPartitioner extends Partitioner
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(TokenPartitioner.class);
+    private static final long serialVersionUID = -8787074052066841747L;
 
     private transient int nrPartitions;
     private transient RangeMap<BigInteger, Integer> partitionMap;
     private transient Map<Integer, Range<BigInteger>> reversePartitionMap;
 
-    private final CassandraRing ring;
     private final transient TokenRangeMapping<RingInstance> tokenRangeMapping;
     private final Integer numberSplits;
 
     public TokenPartitioner(TokenRangeMapping<RingInstance> tokenRangeMapping,
-                            CassandraRing ring,
                             Integer numberSplits,
                             int defaultParallelism,
                             Integer cores)
     {
-        this(tokenRangeMapping, ring, numberSplits, defaultParallelism, cores, true);
+        this(tokenRangeMapping, numberSplits, defaultParallelism, cores, true);
     }
 
     @VisibleForTesting
     public TokenPartitioner(TokenRangeMapping<RingInstance> tokenRangeMapping,
-                            CassandraRing ring,
                             Integer numberSplits,
                             int defaultParallelism,
                             Integer cores,
                             boolean randomize)
     {
         this.tokenRangeMapping = tokenRangeMapping;
-        this.ring = ring;
         this.numberSplits = calculateSplits(tokenRangeMapping, numberSplits, defaultParallelism, cores);
         setupTokenRangeMap(randomize);
         validate();  // Intentionally not keeping this in readObject(), it is enough to validate in constructor alone
@@ -110,7 +106,7 @@ public class TokenPartitioner extends Partitioner
         return reversePartitionMap.get(partitionId);
     }
 
-    private void setupTokenRangeMap(final boolean randomize)
+    private void setupTokenRangeMap(boolean randomize)
     {
         partitionMap = TreeRangeMap.create();
         reversePartitionMap = new HashMap<>();
@@ -165,8 +161,8 @@ public class TokenPartitioner extends Partitioner
     private void validateCompleteRangeCoverage()
     {
         RangeSet<BigInteger> missingRangeSet = TreeRangeSet.create();
-        missingRangeSet.add(Range.closed(ring.getPartitioner().minToken(),
-                                         ring.getPartitioner().maxToken()));
+        missingRangeSet.add(Range.closed(tokenRangeMapping.partitioner().minToken(),
+                                         tokenRangeMapping.partitioner().maxToken()));
 
         partitionMap.asMapOfRanges().keySet().forEach(missingRangeSet::remove);
 

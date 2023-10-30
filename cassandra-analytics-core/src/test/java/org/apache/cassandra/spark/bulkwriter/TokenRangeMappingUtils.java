@@ -35,32 +35,17 @@ import com.google.common.collect.Range;
 
 import org.apache.cassandra.sidecar.common.data.RingEntry;
 import org.apache.cassandra.sidecar.common.data.TokenRangeReplicasResponse.ReplicaMetadata;
-import org.apache.cassandra.spark.bulkwriter.token.CassandraRing;
 import org.apache.cassandra.spark.bulkwriter.token.RangeUtils;
 import org.apache.cassandra.spark.bulkwriter.token.TokenRangeMapping;
 import org.apache.cassandra.spark.data.ReplicationFactor;
 import org.apache.cassandra.spark.data.partitioner.Partitioner;
 
 
-public final class RingUtils
+public final class TokenRangeMappingUtils
 {
-    private RingUtils()
+    private TokenRangeMappingUtils()
     {
         throw new IllegalStateException(getClass() + " is static utility class and shall not be instantiated");
-    }
-
-    public static CassandraRing buildRing(final String dataCenter, final String keyspace)
-    {
-        ImmutableMap<String, Integer> rfByDC = ImmutableMap.of(dataCenter, 3);
-        return buildRing(rfByDC, keyspace);
-    }
-
-    @NotNull
-    static CassandraRing buildRing(final ImmutableMap<String, Integer> rfByDC, final String keyspace)
-    {
-
-        ReplicationFactor replicationFactor = getReplicationFactor(rfByDC);
-        return new CassandraRing(Partitioner.Murmur3Partitioner, keyspace, replicationFactor);
     }
 
     public static TokenRangeMapping<RingInstance> buildTokenRangeMapping(final int initialToken, final ImmutableMap<String, Integer> rfByDC, int instancesPerDC)
@@ -89,6 +74,7 @@ public final class RingUtils
 
         Multimap<RingInstance, Range<BigInteger>> tokenRanges = setupTokenRangeMap(Partitioner.Murmur3Partitioner, replicationFactor, instances);
         return new TokenRangeMapping<>(Partitioner.Murmur3Partitioner,
+                                       replicationFactor,
                                        writeReplicas,
                                        Collections.emptyMap(),
                                        tokenRanges,

@@ -38,7 +38,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import org.apache.cassandra.bridge.RowBufferMode;
-import org.apache.cassandra.spark.bulkwriter.token.CassandraRing;
 import org.apache.cassandra.spark.bulkwriter.token.TokenRangeMapping;
 import org.apache.cassandra.spark.common.model.CassandraInstance;
 import org.mockito.Mockito;
@@ -48,7 +47,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -66,8 +65,7 @@ public class RecordWriterTest
     @TempDir
     public Path folder; // CHECKSTYLE IGNORE: Public mutable field for parameterized testing
 
-    private CassandraRing ring;
-    private TokenRangeMapping tokenRangeMapping;
+    private TokenRangeMapping<RingInstance> tokenRangeMapping;
     private RecordWriter rw;
     private MockTableWriter tw;
     private Tokenizer tokenizer;
@@ -79,9 +77,8 @@ public class RecordWriterTest
     public void setUp()
     {
         tw = new MockTableWriter(folder.getRoot());
-        ring = RingUtils.buildRing(ImmutableMap.of("DC1", 3), "test");
-        tokenRangeMapping = RingUtils.buildTokenRangeMapping(100000, ImmutableMap.of("DC1", 3), 12);
-        writerContext = new MockBulkWriterContext(ring, tokenRangeMapping);
+        tokenRangeMapping = TokenRangeMappingUtils.buildTokenRangeMapping(100000, ImmutableMap.of("DC1", 3), 12);
+        writerContext = new MockBulkWriterContext(tokenRangeMapping);
         tc = new TestTaskContext();
         range = writerContext.job().getTokenPartitioner().getTokenRange(tc.partitionId());
         tokenizer = new Tokenizer(writerContext);
@@ -113,7 +110,7 @@ public class RecordWriterTest
     @Test
     public void testWriteWithConstantTTL()
     {
-        MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(ring, tokenRangeMapping);
+        MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(tokenRangeMapping);
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, true, false, false);
         validateSuccessfulWrite(bulkWriterContext, data, COLUMN_NAMES);
     }
@@ -121,7 +118,7 @@ public class RecordWriterTest
     @Test
     public void testWriteWithTTLColumn()
     {
-        MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(ring, tokenRangeMapping);
+        MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(tokenRangeMapping);
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, true, true, false);
         String[] columnNamesWithTtl =
         {
@@ -133,7 +130,7 @@ public class RecordWriterTest
     @Test
     public void testWriteWithConstantTimestamp()
     {
-        MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(ring, tokenRangeMapping);
+        MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(tokenRangeMapping);
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, true, false, false);
         validateSuccessfulWrite(bulkWriterContext, data, COLUMN_NAMES);
     }
@@ -141,7 +138,7 @@ public class RecordWriterTest
     @Test
     public void testWriteWithTimestampColumn()
     {
-        MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(ring, tokenRangeMapping);
+        MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(tokenRangeMapping);
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, true, false, true);
         String[] columnNamesWithTimestamp =
         {
@@ -153,7 +150,7 @@ public class RecordWriterTest
     @Test
     public void testWriteWithTimestampAndTTLColumn()
     {
-        MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(ring, tokenRangeMapping);
+        MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(tokenRangeMapping);
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, true, true, true);
         String[] columnNames =
         {
@@ -177,7 +174,7 @@ public class RecordWriterTest
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, true);
         List<StreamResult> res = rw.write(data);
         assertEquals(1, res.size());
-        assertFalse(overlapRange.equals(res.get(0).tokenRange));
+        assertNotEquals(overlapRange, res.get(0).tokenRange);
         final Map<CassandraInstance, List<UploadRequest>> uploads = m.getUploads();
         // Should upload to 3 replicas
         assertEquals(uploads.keySet().size(), REPLICA_COUNT);
@@ -207,7 +204,7 @@ public class RecordWriterTest
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateCustomData(numRows, 100001);
         List<StreamResult> res = rw.write(data);
         assertEquals(1, res.size());
-        assertFalse(overlapRange.equals(res.get(0).tokenRange));
+        assertNotEquals(overlapRange, res.get(0).tokenRange);
         final Map<CassandraInstance, List<UploadRequest>> uploads = m.getUploads();
         // Should upload to 3 replicas
         assertEquals(REPLICA_COUNT, uploads.keySet().size());
@@ -234,7 +231,7 @@ public class RecordWriterTest
         List<StreamResult> res = rw.write(data);
         // We expect 2 streams since rows belong to different sub-ranges
         assertEquals(2, res.size());
-        assertFalse(overlapRange.equals(res.get(0).tokenRange));
+        assertNotEquals(overlapRange, res.get(0).tokenRange);
         final Map<CassandraInstance, List<UploadRequest>> uploads = m.getUploads();
         // Should upload to 3 replicas
         assertEquals((REPLICA_COUNT + 1), uploads.keySet().size());

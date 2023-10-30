@@ -43,6 +43,7 @@
   </root>
 
 
+  <logger name="org.apache.cassandra.sidecar" level="DEBUG" />
   <logger name="com.datastax.driver.core" level="ERROR" />
   <logger name="com.datastax.driver.core.ControlConnection" level="OFF" />
 </configuration>

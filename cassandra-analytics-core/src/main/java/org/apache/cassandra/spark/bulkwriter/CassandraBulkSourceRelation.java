@@ -48,7 +48,7 @@ public class CassandraBulkSourceRelation extends BaseRelation implements Inserta
     private final Broadcast<BulkWriterContext> broadcastContext;
 
     @SuppressWarnings("RedundantTypeArguments")
-    public CassandraBulkSourceRelation(BulkWriterContext writerContext, SQLContext sqlContext) throws Exception
+    public CassandraBulkSourceRelation(BulkWriterContext writerContext, SQLContext sqlContext)
     {
         this.writerContext = writerContext;
         this.sqlContext = sqlContext;
@@ -125,21 +125,30 @@ public class CassandraBulkSourceRelation extends BaseRelation implements Inserta
             {
                 // We've made our best effort to close the Bulk Writer context
             }
-            try
+            unpersist();
+        }
+    }
+
+    /**
+     * Deletes cached copies of the broadcast on the executors
+     */
+    protected void unpersist()
+    {
+        try
+        {
+            LOGGER.info("Unpersisting broadcast context");
+            broadcastContext.unpersist(false);
+        }
+        catch (Throwable throwable)
+        {
+            if (NonFatal$.MODULE$.apply(throwable))
             {
-                broadcastContext.unpersist(false);
+                LOGGER.error("Uncaught exception in thread {} attempting to unpersist broadcast variable",
+                             Thread.currentThread().getName(), throwable);
             }
-            catch (Throwable throwable)
+            else
             {
-                if (NonFatal$.MODULE$.apply(throwable))
-                {
-                    LOGGER.error("Uncaught exception in thread {} attempting to unpersist broadcast variable",
-                                 Thread.currentThread().getName(), throwable);
-                }
-                else
-                {
-                    throw throwable;
-                }
+                throw throwable;
             }
         }
     }

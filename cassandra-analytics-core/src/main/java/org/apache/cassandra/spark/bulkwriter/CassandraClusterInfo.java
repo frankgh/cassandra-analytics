@@ -39,6 +39,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Range;
+import com.google.common.net.HostAndPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +55,6 @@ import org.apache.cassandra.sidecar.common.data.TimeSkewResponse;
 import org.apache.cassandra.sidecar.common.data.TokenRangeReplicasResponse;
 import org.apache.cassandra.sidecar.common.data.TokenRangeReplicasResponse.ReplicaInfo;
 import org.apache.cassandra.sidecar.common.data.TokenRangeReplicasResponse.ReplicaMetadata;
-import org.apache.cassandra.spark.bulkwriter.token.CassandraRing;
 import org.apache.cassandra.spark.bulkwriter.token.TokenRangeMapping;
 import org.apache.cassandra.spark.common.client.InstanceState;
 import org.apache.cassandra.spark.common.client.InstanceStatus;
@@ -63,7 +63,6 @@ import org.apache.cassandra.spark.data.partitioner.Partitioner;
 import org.apache.cassandra.spark.utils.CqlUtils;
 import org.apache.cassandra.spark.utils.FutureUtils;
 import org.jetbrains.annotations.NotNull;
-import org.sparkproject.guava.net.HostAndPort;
 
 public class CassandraClusterInfo implements ClusterInfo, Closeable
 {
@@ -73,10 +72,8 @@ public class CassandraClusterInfo implements ClusterInfo, Closeable
     protected final BulkSparkConf conf;
     protected String cassandraVersion;
     protected Partitioner partitioner;
-    protected transient CassandraRing ring;
 
     protected transient TokenRangeMapping<RingInstance> tokenRangeReplicas;
-    protected transient Map<RingInstance, InstanceAvailability> availability;
     protected transient String keyspaceSchema;
     protected transient GossipInfoResponse gossipInfo;
     protected transient CassandraContext cassandraContext;
@@ -234,13 +231,6 @@ public class CassandraClusterInfo implements ClusterInfo, Closeable
         return schemaResponse.schema();
     }
 
-    @NotNull
-    protected CassandraRing getCurrentRing()
-    {
-        ReplicationFactor replicationFactor = getReplicationFactor();
-        return new CassandraRing(getPartitioner(), conf.keyspace, replicationFactor);
-    }
-
     private TokenRangeReplicasResponse getTokenRangesAndReplicaSets() throws ExecutionException, InterruptedException
     {
         CassandraContext context = getCassandraContext();
@@ -293,38 +283,6 @@ public class CassandraClusterInfo implements ClusterInfo, Closeable
         }
     }
 
-    /**
-     * Fetch the (optionally cached) ring metadata including replication factor and partitioner
-     *
-     * @param cached
-     * @return CassandraRing holder for ring metadata
-     */
-    @Override
-    public CassandraRing getRing(boolean cached)
-    {
-        CassandraRing currentRing = ring;
-        if (cached && currentRing != null)
-        {
-            return currentRing;
-        }
-
-        synchronized (this)
-        {
-            if (!cached || ring == null)
-            {
-                try
-                {
-                    ring = getCurrentRing();
-                }
-                catch (Exception exception)
-                {
-                    throw new RuntimeException("Unable to initialize ring information", exception);
-                }
-            }
-            return ring;
-        }
-    }
-
     @Override
     public TokenRangeMapping<RingInstance> getTokenRangeMapping(boolean cached)
     {
@@ -336,18 +294,18 @@ public class CassandraClusterInfo implements ClusterInfo, Closeable
 
         synchronized (this)
         {
-            if (!cached || tokenRangeReplicas == null)
+            if (!cached || this.tokenRangeReplicas == null)
             {
                 try
                 {
-                    tokenRangeReplicas = getTokenRangeReplicas();
+                    this.tokenRangeReplicas = getTokenRangeReplicas();
                 }
                 catch (Exception exception)
                 {
                     throw new RuntimeException("Unable to initialize ring information", exception);
                 }
             }
-            return tokenRangeReplicas;
+            return this.tokenRangeReplicas;
         }
     }
 
@@ -474,22 +432,13 @@ public class CassandraClusterInfo implements ClusterInfo, Closeable
 
         // Include availability info so CL checks can use it to exclude replacement hosts
         return new TokenRangeMapping<>(getPartitioner(),
+                                       getReplicationFactor(),
                                        writeReplicasByDC,
                                        pendingReplicasByDC,
                                        tokenRangesByInstance,
                                        replicaMetadata,
                                        blockedInstances,
                                        replacementInstances);
-    }
-
-    private Map<String, Set<String>> getReplacementInstancesByDC(TokenRangeReplicasResponse response)
-    {
-        return response.replicaMetadata()
-                       .stream()
-                       .filter(m -> m.state().equalsIgnoreCase(InstanceState.REPLACING.toString()))
-                       .collect(Collectors.groupingBy(ReplicaMetadata::datacenter,
-                                                      Collectors.mapping(ReplicaMetadata::address,
-                                                                         Collectors.toSet())));
     }
 
     private Set<String> filterAndMergeInstances(Set<String> instancesList1, Set<String> instancesList2, Set<String> blockedIPs)

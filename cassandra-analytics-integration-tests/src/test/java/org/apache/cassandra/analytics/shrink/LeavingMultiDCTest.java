@@ -42,7 +42,7 @@ import org.apache.cassandra.utils.Shared;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 
 @ExtendWith(VertxExtension.class)
-class LeavingTestMultiDC extends LeavingBaseTest
+class LeavingMultiDCTest extends LeavingBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
     void allReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext)

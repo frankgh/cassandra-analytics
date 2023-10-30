@@ -37,22 +37,24 @@ import com.google.common.collect.TreeRangeMap;
 import org.apache.cassandra.sidecar.common.data.TokenRangeReplicasResponse.ReplicaMetadata;
 import org.apache.cassandra.spark.bulkwriter.RingInstance;
 import org.apache.cassandra.spark.common.model.CassandraInstance;
+import org.apache.cassandra.spark.data.ReplicationFactor;
 import org.apache.cassandra.spark.data.partitioner.Partitioner;
 
 public class TokenRangeMapping<Instance extends CassandraInstance> implements Serializable
 {
-
+    private static final long serialVersionUID = -7284933683815811160L;
     private final Partitioner partitioner;
-
-    private transient Set<RingInstance> blockedInstances;
-    private transient Set<RingInstance> replacementInstances;
-    private transient RangeMap<BigInteger, List<Instance>> replicasByTokenRange;
-    private transient Multimap<Instance, Range<BigInteger>> tokenRangeMap;
-    private transient Map<String, Set<String>> writeReplicasByDC;
-    private transient Map<String, Set<String>> pendingReplicasByDC;
-    private transient List<ReplicaMetadata> replicaMetadata;
+    private final ReplicationFactor replicationFactor;
+    private final transient Set<RingInstance> blockedInstances;
+    private final transient Set<RingInstance> replacementInstances;
+    private final transient RangeMap<BigInteger, List<Instance>> replicasByTokenRange;
+    private final transient Multimap<Instance, Range<BigInteger>> tokenRangeMap;
+    private final transient Map<String, Set<String>> writeReplicasByDC;
+    private final transient Map<String, Set<String>> pendingReplicasByDC;
+    private final transient List<ReplicaMetadata> replicaMetadata;
 
     public TokenRangeMapping(Partitioner partitioner,
+                             ReplicationFactor replicationFactor,
                              Map<String, Set<String>> writeReplicasByDC,
                              Map<String, Set<String>> pendingReplicasByDC,
                              Multimap<Instance, Range<BigInteger>> tokenRanges,
@@ -61,6 +63,7 @@ public class TokenRangeMapping<Instance extends CassandraInstance> implements Se
                              Set<RingInstance> replacementInstances)
     {
         this.partitioner = partitioner;
+        this.replicationFactor = replicationFactor;
         this.tokenRangeMap = tokenRanges;
         this.pendingReplicasByDC = pendingReplicasByDC;
         this.writeReplicasByDC = writeReplicasByDC;
@@ -69,6 +72,16 @@ public class TokenRangeMapping<Instance extends CassandraInstance> implements Se
         this.replicaMetadata = replicaMetadata;
         // Populate reverse mapping of ranges to replicas
         this.replicasByTokenRange = populateReplicas();
+    }
+
+    public Partitioner partitioner()
+    {
+        return partitioner;
+    }
+
+    public ReplicationFactor replicationFactor()
+    {
+        return replicationFactor;
     }
 
     /**

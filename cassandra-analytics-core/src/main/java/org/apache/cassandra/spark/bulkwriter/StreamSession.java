@@ -46,7 +46,6 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.cassandra.spark.bulkwriter.token.CassandraRing;
 import org.apache.cassandra.spark.bulkwriter.token.ReplicaAwareFailureHandler;
 import org.apache.cassandra.spark.bulkwriter.token.TokenRangeMapping;
 import org.apache.cassandra.spark.common.MD5Hash;
@@ -65,7 +64,6 @@ public class StreamSession
     private final ExecutorService executor;
     private final List<Future<?>> futures = new ArrayList<>();
     private final TokenRangeMapping<RingInstance> tokenRangeMapping;
-    private final CassandraRing ring;
     private static final String WRITE_PHASE = "UploadAndCommit";
 
     public StreamSession(final BulkWriterContext writerContext,
@@ -84,7 +82,6 @@ public class StreamSession
                          ReplicaAwareFailureHandler<RingInstance> failureHandler)
     {
         this.writerContext = writerContext;
-        this.ring = writerContext.cluster().getRing(true);
         this.tokenRangeMapping = writerContext.cluster().getTokenRangeMapping(true);
         this.sessionID = sessionID;
         this.tokenRange = tokenRange;
@@ -111,7 +108,7 @@ public class StreamSession
 
     public StreamResult close() throws ExecutionException, InterruptedException
     {
-        for (Future future : futures)
+        for (Future<?> future : futures)
         {
             try
             {
@@ -141,14 +138,14 @@ public class StreamSession
             streamResult.setCommitResults(cr);
             LOGGER.debug("StreamResult: {}", streamResult);
             // Check consistency given the no. failures
-            BulkWriteValidator.validateClOrFail(ring, tokenRangeMapping, failureHandler, LOGGER, WRITE_PHASE, writerContext.job());
+            BulkWriteValidator.validateClOrFail(tokenRangeMapping, failureHandler, LOGGER, WRITE_PHASE, writerContext.job());
             return streamResult;
         }
     }
 
     private List<CommitResult> commit(StreamResult streamResult) throws ExecutionException, InterruptedException
     {
-        try (CommitCoordinator cc = CommitCoordinator.commit(writerContext, new StreamResult[]{streamResult}))
+        try (CommitCoordinator cc = CommitCoordinator.commit(writerContext, new StreamResult[]{streamResult }))
         {
             List<CommitResult> commitResults = cc.get();
             LOGGER.debug("All CommitResults: {}", commitResults);

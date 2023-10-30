@@ -116,7 +116,7 @@ public final class Sidecar
                                                                    .maxRetryDelayMillis(config.maxMillisToSleep())
                                                                    .build();
 
-        return buildClient((SidecarClientConfigImpl) sidecarConfig, vertx, httpClientConfig, sidecarInstancesProvider);
+        return buildClient(sidecarConfig, vertx, httpClientConfig, sidecarInstancesProvider);
     }
 
     public static SidecarClient from(SidecarInstancesProvider sidecarInstancesProvider, BulkSparkConf conf)
@@ -147,10 +147,10 @@ public final class Sidecar
                                                                    .maxRetryDelayMillis(500)
                                                                    .build();
 
-        return buildClient((SidecarClientConfigImpl) sidecarConfig, vertx, httpClientConfig, sidecarInstancesProvider);
+        return buildClient(sidecarConfig, vertx, httpClientConfig, sidecarInstancesProvider);
     }
 
-    public static SidecarClient buildClient(SidecarClientConfigImpl sidecarConfig,
+    public static SidecarClient buildClient(SidecarClientConfig sidecarConfig,
                                             Vertx vertx,
                                             HttpClientConfig httpClientConfig,
                                             SidecarInstancesProvider clusterConfig)

@@ -29,7 +29,6 @@ import com.google.common.collect.Range;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.apache.cassandra.spark.bulkwriter.token.CassandraRing;
 import org.apache.cassandra.spark.bulkwriter.token.ReplicaAwareFailureHandler;
 import org.apache.cassandra.spark.bulkwriter.token.TokenRangeMapping;
 
@@ -51,15 +50,14 @@ public class BulkWriteValidator
         this.failureHandler = failureHandler;
     }
 
-    public static void validateClOrFail(CassandraRing ring,
-                                        TokenRangeMapping<RingInstance> tokenRangeMapping,
+    public static void validateClOrFail(TokenRangeMapping<RingInstance> tokenRangeMapping,
                                         ReplicaAwareFailureHandler<RingInstance> failureHandler,
                                         Logger logger,
                                         String phase,
                                         JobInfo job)
     {
         Collection<AbstractMap.SimpleEntry<Range<BigInteger>, Multimap<RingInstance, String>>> failedRanges =
-        failureHandler.getFailedEntries(ring, tokenRangeMapping, job.getConsistencyLevel(), job.getLocalDC());
+        failureHandler.getFailedEntries(tokenRangeMapping, job.getConsistencyLevel(), job.getLocalDC());
 
         if (failedRanges.isEmpty())
         {
@@ -111,7 +109,7 @@ public class BulkWriteValidator
         // Updates failures by looking up instance metadata
         updateInstanceAvailability();
         // Fails if the failures violate consistency requirements
-        validateClOrFail(cluster.getRing(true), tokenRangeMapping, failureHandler, LOGGER, phase, job);
+        validateClOrFail(tokenRangeMapping, failureHandler, LOGGER, phase, job);
     }
 
     private void updateInstanceAvailability()

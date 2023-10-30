@@ -26,7 +26,7 @@ import java.util.Optional;
 import java.util.stream.Stream;
 
 import com.google.common.base.Preconditions;
-import org.junit.jupiter.api.extension.AfterTestExecutionCallback;
+import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -137,7 +137,7 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
         @Override
         public List<Extension> getAdditionalExtensions()
         {
-            return Arrays.asList(parameterResolver(), postProcessor(), beforeEach());
+            return Arrays.asList(parameterResolver(), afterEach(), beforeEach());
         }
 
         private BeforeEachCallback beforeEach()
@@ -159,8 +159,8 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
 
                 UpgradeableCluster.Builder clusterBuilder =
                 UpgradeableCluster.build(originalNodeCount)
-                                  // Disabling dynamic port allocaiton until we can get it working across JVM forks
-                                  //.withDynamicPortAllocation(true) // to allow parallel test runs
+                                  // Disabling dynamic port allocation until we can get it working across JVM forks
+                                  .withDynamicPortAllocation(true) // to allow parallel test runs
                                   .withVersion(requestedVersion)
                                   .withDCs(dcCount)
                                   .withDataDirCount(annotation.numDataDirsPerInstance())
@@ -190,11 +190,12 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
         }
 
         /**
-         * Shuts down the in-jvm dtest cluster when the test is finished
+         * Shuts down the in-jvm dtest cluster after an individual test and any user-defined teardown methods
+         * have been executed
          *
-         * @return the {@link AfterTestExecutionCallback}
+         * @return the {@link AfterEachCallback}
          */
-        private AfterTestExecutionCallback postProcessor()
+        private AfterEachCallback afterEach()
         {
             return postProcessorCtx -> {
                 if (cassandraTestContext != null)

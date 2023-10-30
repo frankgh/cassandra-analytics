@@ -45,6 +45,7 @@ public class RingInstance implements CassandraInstance, Serializable
         this.ringEntry = new RingEntry.Builder()
                          .fqdn(replica.fqdn())
                          .address(replica.address())
+                         .port(replica.port())
                          .datacenter(replica.datacenter())
                          .state(replica.state())
                          .status(replica.status())

@@ -42,6 +42,10 @@ public interface ConsistencyLevel
      *   Write replicas are adjusted to exclude replacement nodes for consistency checks, if we have replacement nodes that are not among the failed instances.
      *   This is to ensure that we are writing to sufficient non-replacement nodes as replacements can potentially fail leaving us with fewer nodes.
      * </pre>
+     *
+     * TODO javadocs
+     * @param localDC           the local datacenter used for consistency level, or {@code null} if not provided
+     * @return {@code true} if the consistency has been met, {@code false} otherwise
      */
     boolean checkConsistency(Set<String> writeReplicas,
                              Set<String> pendingReplicas,

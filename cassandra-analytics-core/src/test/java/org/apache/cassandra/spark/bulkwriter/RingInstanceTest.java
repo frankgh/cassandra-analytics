@@ -40,7 +40,6 @@ import com.google.common.collect.Range;
 import org.junit.jupiter.api.Test;
 
 import org.apache.cassandra.sidecar.common.data.RingEntry;
-import org.apache.cassandra.spark.bulkwriter.token.CassandraRing;
 import org.apache.cassandra.spark.bulkwriter.token.ConsistencyLevel;
 import org.apache.cassandra.spark.bulkwriter.token.ReplicaAwareFailureHandler;
 import org.apache.cassandra.spark.bulkwriter.token.TokenRangeMapping;
@@ -128,16 +127,16 @@ public class RingInstanceTest
     @Test
     public void testEquals()
     {
-        RingInstance instance1 = RingUtils.getInstances(0, ImmutableMap.of("DATACENTER1", 1), 1).get(0);
-        RingInstance instance2 = RingUtils.getInstances(0, ImmutableMap.of("DATACENTER1", 1), 1).get(0);
+        RingInstance instance1 = TokenRangeMappingUtils.getInstances(0, ImmutableMap.of("DATACENTER1", 1), 1).get(0);
+        RingInstance instance2 = TokenRangeMappingUtils.getInstances(0, ImmutableMap.of("DATACENTER1", 1), 1).get(0);
         assertEquals(instance1, instance2);
     }
 
     @Test
     public void testHashCode()
     {
-        RingInstance instance1 = RingUtils.getInstances(0, ImmutableMap.of("DATACENTER1", 1), 1).get(0);
-        RingInstance instance2 = RingUtils.getInstances(0, ImmutableMap.of("DATACENTER1", 1), 1).get(0);
+        RingInstance instance1 = TokenRangeMappingUtils.getInstances(0, ImmutableMap.of("DATACENTER1", 1), 1).get(0);
+        RingInstance instance2 = TokenRangeMappingUtils.getInstances(0, ImmutableMap.of("DATACENTER1", 1), 1).get(0);
         assertEquals(instance1.hashCode(), instance2.hashCode());
     }
 
@@ -178,8 +177,8 @@ public class RingInstanceTest
     @Test
     public void multiMapWorksWithRingInstances()
     {
-        RingInstance instance1 = RingUtils.getInstances(0, ImmutableMap.of("DATACENTER1", 1), 1).get(0);
-        RingInstance instance2 = RingUtils.getInstances(0, ImmutableMap.of("DATACENTER1", 1), 1).get(0);
+        RingInstance instance1 = TokenRangeMappingUtils.getInstances(0, ImmutableMap.of("DATACENTER1", 1), 1).get(0);
+        RingInstance instance2 = TokenRangeMappingUtils.getInstances(0, ImmutableMap.of("DATACENTER1", 1), 1).get(0);
         byte[] buffer;
 
         try
@@ -221,15 +220,15 @@ public class RingInstanceTest
                                                           .collect(Collectors.groupingBy(CassandraInstance::getDataCenter,
                                                                                          Collectors.mapping(CassandraInstance::getNodeName,
                                                                                                             Collectors.toSet())));
-        Multimap<RingInstance, Range<BigInteger>> tokenRanges = RingUtils.setupTokenRangeMap(partitioner, repFactor, instances);
-        CassandraRing ring = new CassandraRing(partitioner, KEYSPACE, repFactor);
-        TokenRangeMapping<CassandraInstance> tokenRange = new TokenRangeMapping(partitioner,
-                                                                                writeReplicas,
-                                                                                Collections.emptyMap(),
-                                                                                tokenRanges,
-                                                                                Collections.emptyList(),
-                                                                                Collections.emptySet(),
-                                                                                Collections.emptySet());
+        Multimap<RingInstance, Range<BigInteger>> tokenRanges = TokenRangeMappingUtils.setupTokenRangeMap(partitioner, repFactor, instances);
+        TokenRangeMapping<RingInstance> tokenRange = new TokenRangeMapping<>(partitioner,
+                                                                             repFactor,
+                                                                             writeReplicas,
+                                                                             Collections.emptyMap(),
+                                                                             tokenRanges,
+                                                                             Collections.emptyList(),
+                                                                             Collections.emptySet(),
+                                                                             Collections.emptySet());
 
         // This test proves that for any RF3 keyspace
         replicationFactor3.addFailure(Range.openClosed(tokens[0], tokens[1]), instance1, "Complete Failure");
@@ -237,7 +236,7 @@ public class RingInstanceTest
         replicationFactor3.addFailure(Range.openClosed(tokens[0].add(BigInteger.ONE),
                                                        tokens[0].add(BigInteger.valueOf(2L))), instance2, "Failure 2");
 
-        replicationFactor3.getFailedEntries(ring, tokenRange, ConsistencyLevel.CL.LOCAL_QUORUM, DATACENTER_1);
-        assertFalse(replicationFactor3.hasFailed(ring, tokenRange, ConsistencyLevel.CL.LOCAL_QUORUM, DATACENTER_1));
+        replicationFactor3.getFailedEntries(tokenRange, ConsistencyLevel.CL.LOCAL_QUORUM, DATACENTER_1);
+        assertFalse(replicationFactor3.hasFailed(tokenRange, ConsistencyLevel.CL.LOCAL_QUORUM, DATACENTER_1));
     }
 }

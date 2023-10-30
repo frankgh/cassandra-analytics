@@ -29,7 +29,6 @@ import java.util.stream.Collectors;
 import javax.validation.constraints.NotNull;
 
 import com.google.common.collect.ImmutableMap;
-
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.io.TempDir;
@@ -38,7 +37,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import org.apache.cassandra.bridge.CassandraVersion;
 import org.apache.cassandra.bridge.CassandraVersionFeatures;
-import org.apache.cassandra.spark.bulkwriter.token.CassandraRing;
 import org.apache.cassandra.spark.bulkwriter.token.ConsistencyLevel;
 import org.apache.cassandra.spark.bulkwriter.token.TokenRangeMapping;
 
@@ -51,11 +49,11 @@ public class SSTableWriterTest
     public static Iterable<Object[]> data()
     {
         return Arrays.stream(CassandraVersion.supportedVersions())
-                     .map(version -> new Object[]{version})
+                     .map(version -> new Object[]{version })
                      .collect(Collectors.toList());
     }
 
-    private @NotNull TokenRangeMapping<RingInstance> tokenRangeMapping = RingUtils.buildTokenRangeMapping(0, ImmutableMap.of("DC1", 3), 12);
+    private @NotNull TokenRangeMapping<RingInstance> tokenRangeMapping = TokenRangeMappingUtils.buildTokenRangeMapping(0, ImmutableMap.of("DC1", 3), 12);
 
     @BeforeAll
     public static void setProps()
@@ -77,8 +75,6 @@ public class SSTableWriterTest
         }
     }
 
-    @NotNull
-    public CassandraRing ring = RingUtils.buildRing("DC1", "test");  // CHECKSTYLE IGNORE: Public mutable field
     @TempDir
     public Path tmpDir; // CHECKSTYLE IGNORE: Public mutable field for testing
 
@@ -87,7 +83,7 @@ public class SSTableWriterTest
     @MethodSource("data")
     public void canCreateWriterForVersion(String version) throws IOException
     {
-        MockBulkWriterContext writerContext = new MockBulkWriterContext(ring, tokenRangeMapping, version, ConsistencyLevel.CL.LOCAL_QUORUM);
+        MockBulkWriterContext writerContext = new MockBulkWriterContext(tokenRangeMapping, version, ConsistencyLevel.CL.LOCAL_QUORUM);
         SSTableWriter tw = new SSTableWriter(writerContext, tmpDir);
         tw.addRow(BigInteger.ONE, ImmutableMap.of("id", 1, "date", 1, "course", "foo", "marks", 1));
         tw.close(writerContext, 1);

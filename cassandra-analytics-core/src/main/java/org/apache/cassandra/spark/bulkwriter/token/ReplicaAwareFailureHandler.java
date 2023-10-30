@@ -95,27 +95,26 @@ public class ReplicaAwareFailureHandler<Instance extends CassandraInstance>
      * successful operation.
      */
     public Collection<AbstractMap.SimpleEntry<Range<BigInteger>, Multimap<Instance, String>>>
-    getFailedEntries(final CassandraRing ring,
-                     final TokenRangeMapping<Instance> tokenRangeMapping,
-                     final ConsistencyLevel cl,
-                     final String localDC)
+    getFailedEntries(TokenRangeMapping<? extends CassandraInstance> tokenRangeMapping,
+                     ConsistencyLevel cl,
+                     String localDC)
     {
 
-        final List<AbstractMap.SimpleEntry<Range<BigInteger>, Multimap<Instance, String>>> failedEntries =
+        List<AbstractMap.SimpleEntry<Range<BigInteger>, Multimap<Instance, String>>> failedEntries =
         new ArrayList<>();
 
-        for (final Map.Entry<Range<BigInteger>, Multimap<Instance, String>> failedRangeEntry
+        for (Map.Entry<Range<BigInteger>, Multimap<Instance, String>> failedRangeEntry
         : failedRangesMap.asMapOfRanges().entrySet())
         {
-            final Multimap<Instance, String> errorMap = failedRangeEntry.getValue();
-            final Collection<Instance> failedInstances = errorMap.keySet()
-                                                                 .stream()
-                                                                 .filter(inst ->
-                                                                         !errorMap.get(inst).isEmpty())
-                                                                 .collect(Collectors.toList());
+            Multimap<Instance, String> errorMap = failedRangeEntry.getValue();
+            Collection<Instance> failedInstances = errorMap.keySet()
+                                                           .stream()
+                                                           .filter(inst ->
+                                                                   !errorMap.get(inst).isEmpty())
+                                                           .collect(Collectors.toList());
 
 
-            if (!validateConsistency(ring, tokenRangeMapping, failedInstances, cl, localDC))
+            if (!validateConsistency(tokenRangeMapping, failedInstances, cl, localDC))
             {
                 failedEntries.add(new AbstractMap.SimpleEntry<>(failedRangeEntry.getKey(),
                                                                 failedRangeEntry.getValue()));
@@ -125,8 +124,7 @@ public class ReplicaAwareFailureHandler<Instance extends CassandraInstance>
         return failedEntries;
     }
 
-    private boolean validateConsistency(CassandraRing ring,
-                                        TokenRangeMapping<Instance> tokenRangeMapping,
+    private boolean validateConsistency(TokenRangeMapping<? extends CassandraInstance> tokenRangeMapping,
                                         Collection<Instance> failedInstances,
                                         ConsistencyLevel cl,
                                         String localDC)
@@ -137,25 +135,24 @@ public class ReplicaAwareFailureHandler<Instance extends CassandraInstance>
                                                        .map(CassandraInstance::getIpAddress)
                                                        .collect(Collectors.toSet());
         Set<String> datacenters = Collections.emptySet();
+        ReplicationFactor replicationFactor = tokenRangeMapping.replicationFactor();
         if (cl == ConsistencyLevel.CL.EACH_QUORUM)
         {
-            datacenters = ring.getReplicationFactor().getOptions().keySet();
-            Preconditions.checkArgument(ring.getReplicationFactor().getReplicationStrategy() != ReplicationFactor.ReplicationStrategy.SimpleStrategy,
-                                        "EACH_QUORUM doesn't make sense for SimpleStrategy keyspaces");
-
+            datacenters = replicationFactor.getOptions().keySet();
+            Preconditions.checkArgument(replicationFactor.getReplicationStrategy() == ReplicationFactor.ReplicationStrategy.NetworkTopologyStrategy,
+                                        "%s requires %s replication strategy", cl, ReplicationFactor.ReplicationStrategy.NetworkTopologyStrategy);
         }
 
-        if (cl == ConsistencyLevel.CL.LOCAL_QUORUM || cl == ConsistencyLevel.CL.LOCAL_ONE)
+        if (cl.isLocal())
         {
             datacenters = Collections.singleton(localDC);
-            Preconditions.checkArgument(ring.getReplicationFactor().getReplicationStrategy() != ReplicationFactor.ReplicationStrategy.SimpleStrategy,
-                                        cl + " doesn't make sense for SimpleStrategy keyspaces");
-
+            Preconditions.checkArgument(replicationFactor.getReplicationStrategy() == ReplicationFactor.ReplicationStrategy.NetworkTopologyStrategy,
+                                        "%s requires %s replication strategy", cl, ReplicationFactor.ReplicationStrategy.NetworkTopologyStrategy);
         }
 
         if (!datacenters.isEmpty())
         {
-            for (String dc: datacenters)
+            for (String dc : datacenters)
             {
                 Set<String> failedIpsPerDC = failedInstances.stream()
                                                             .filter(inst -> inst.getDataCenter().matches(dc))
@@ -192,12 +189,11 @@ public class ReplicaAwareFailureHandler<Instance extends CassandraInstance>
         return isConsistencyLevelMet;
     }
 
-    public boolean hasFailed(final CassandraRing ring,
-                             final TokenRangeMapping<Instance> tokenRange,
-                             final ConsistencyLevel cl,
-                             final String localDC)
+    public boolean hasFailed(TokenRangeMapping<? extends CassandraInstance> tokenRange,
+                             ConsistencyLevel cl,
+                             String localDC)
     {
-        return !getFailedEntries(ring, tokenRange, cl, localDC).isEmpty();
+        return !getFailedEntries(tokenRange, cl, localDC).isEmpty();
     }
 
     private static Set<String> maybeUpdateWriteReplicasForReplacements(Set<String> writeReplicas, Set<String> replacingInstances, Set<String> failedInstances)

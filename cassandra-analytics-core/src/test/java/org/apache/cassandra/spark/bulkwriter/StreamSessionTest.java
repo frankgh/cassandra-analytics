@@ -37,7 +37,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import org.apache.cassandra.spark.bulkwriter.token.CassandraRing;
 import org.apache.cassandra.spark.bulkwriter.token.ReplicaAwareFailureHandler;
 import org.apache.cassandra.spark.bulkwriter.token.TokenRangeMapping;
 import org.apache.cassandra.spark.common.model.CassandraInstance;
@@ -66,7 +65,6 @@ public class StreamSessionTest
     private StreamSession ss;
     private MockBulkWriterContext writerContext;
     private List<String> expectedInstances;
-    private CassandraRing ring;
     private TokenRangeMapping<RingInstance> tokenRangeMapping;
     private MockScheduledExecutorService executor;
     private MockTableWriter tableWriter;
@@ -76,8 +74,7 @@ public class StreamSessionTest
     public void setup()
     {
         range = Range.range(BigInteger.valueOf(101L), BoundType.CLOSED, BigInteger.valueOf(199L), BoundType.CLOSED);
-        ring = RingUtils.buildRing(ImmutableMap.of("DC1", 3), "test");
-        tokenRangeMapping = RingUtils.buildTokenRangeMapping(0, ImmutableMap.of("DC1", 3), 12);
+        tokenRangeMapping = TokenRangeMappingUtils.buildTokenRangeMapping(0, ImmutableMap.of("DC1", 3), 12);
         writerContext = getBulkWriterContext();
         tableWriter = new MockTableWriter(folder);
         executor = new MockScheduledExecutorService();
@@ -266,6 +263,6 @@ public class StreamSessionTest
     @NotNull
     private MockBulkWriterContext getBulkWriterContext()
     {
-        return new MockBulkWriterContext(ring, tokenRangeMapping);
+        return new MockBulkWriterContext(tokenRangeMapping);
     }
 }

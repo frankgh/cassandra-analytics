@@ -83,9 +83,6 @@ tasks.idea.dependsOn(tasks.copyInspections)
 tasks.register('buildIgnoreRatList', Exec) {
   description 'Builds a list of ignored files for the rat task from the unversioned git files'
   commandLine 'bash', '-c', 'git clean --force -d --dry-run -x | grep -v "Would skip" | cut -c 14- '
-//    +
-//          '&& ' +
-//                            'git clean --force -d --dry-run -x | grep "Would skip" | cut -c 23-\n'
   doFirst {
   // make sure the build directory exists so rat task can run independently
     Files.createDirectories(buildDir)
@@ -198,7 +195,7 @@ subprojects {
       }
     }
     // uncomment the line below for local development
-    // mavenLocal()
+    //mavenLocal()
   }
 
   dependencies {

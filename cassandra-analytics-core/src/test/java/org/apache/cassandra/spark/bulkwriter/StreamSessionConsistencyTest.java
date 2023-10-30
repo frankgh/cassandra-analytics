@@ -41,7 +41,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import org.apache.cassandra.spark.bulkwriter.token.CassandraRing;
 import org.apache.cassandra.spark.bulkwriter.token.ConsistencyLevel;
 import org.apache.cassandra.spark.bulkwriter.token.ReplicaAwareFailureHandler;
 import org.apache.cassandra.spark.bulkwriter.token.TokenRangeMapping;
@@ -60,8 +59,8 @@ public class StreamSessionConsistencyTest
     private static final int REPLICATION_FACTOR = 3;
     private static final List<String> EXPECTED_INSTANCES = ImmutableList.of("DC1-i1", "DC1-i2", "DC1-i3", "DC2-i1", "DC2-i2", "DC2-i3");
     private static final Range<BigInteger> RANGE = Range.range(BigInteger.valueOf(101L), BoundType.CLOSED, BigInteger.valueOf(199L), BoundType.CLOSED);
-    private static final CassandraRing RING = RingUtils.buildRing(ImmutableMap.of("DC1", 3, "DC2", 3), "test");
-    private static final TokenRangeMapping<RingInstance> TOKEN_RANGE_MAPPING = RingUtils.buildTokenRangeMapping(0, ImmutableMap.of("DC1", 3, "DC2", 3), 6);
+    private static final TokenRangeMapping<RingInstance> TOKEN_RANGE_MAPPING =
+    TokenRangeMappingUtils.buildTokenRangeMapping(0, ImmutableMap.of("DC1", 3, "DC2", 3), 6);
     private static final Map<String, Object> COLUMN_BIND_VALUES = ImmutableMap.of("id", 0, "date", 1, "course", "course", "marks", 2);
 
     @TempDir
@@ -83,7 +82,7 @@ public class StreamSessionConsistencyTest
     private void setup(ConsistencyLevel.CL consistencyLevel, List<Integer> failuresPerDc)
     {
         tableWriter = new MockTableWriter(folder);
-        writerContext = new MockBulkWriterContext(RING, TOKEN_RANGE_MAPPING, "cassandra-4.0.0", consistencyLevel);
+        writerContext = new MockBulkWriterContext(TOKEN_RANGE_MAPPING, "cassandra-4.0.0", consistencyLevel);
         streamSession = new StreamSession(writerContext,
                                           "sessionId",
                                           RANGE,
@@ -116,7 +115,7 @@ public class StreamSessionConsistencyTest
             }
             else
             {
-                return new DataTransferApi.RemoteCommitResult(true, Collections.emptyList(), uuids,  "");
+                return new DataTransferApi.RemoteCommitResult(true, Collections.emptyList(), uuids, "");
             }
         });
         SSTableWriter tr = new NonValidatingTestSSTableWriter(tableWriter, folder);

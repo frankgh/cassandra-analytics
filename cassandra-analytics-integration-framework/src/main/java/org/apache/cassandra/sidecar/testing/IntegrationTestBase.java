@@ -23,7 +23,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -46,16 +45,22 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.util.Modules;
 import io.vertx.core.Vertx;
-import io.vertx.core.http.HttpServer;
+import io.vertx.core.eventbus.Message;
+import io.vertx.core.eventbus.MessageConsumer;
+import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.junit5.VertxTestContext;
-import org.apache.cassandra.sidecar.MainModule;
+import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
 import org.apache.cassandra.sidecar.cluster.InstancesConfig;
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
 import org.apache.cassandra.sidecar.common.data.QualifiedTableName;
 import org.apache.cassandra.sidecar.common.dns.DnsResolver;
+import org.apache.cassandra.sidecar.server.MainModule;
+import org.apache.cassandra.sidecar.server.Server;
 import org.apache.cassandra.testing.AbstractCassandraTestContext;
 import org.assertj.core.api.Assertions;
+
+import static org.apache.cassandra.sidecar.server.SidecarServerEvents.ON_CASSANDRA_CQL_READY;
 
 /**
  * Base class for integration test.
@@ -68,7 +73,7 @@ public abstract class IntegrationTestBase
     private static final long MAX_KEYSPACE_TABLE_TIME = 100L;
     protected Logger logger = LoggerFactory.getLogger(this.getClass());
     protected Vertx vertx;
-    protected HttpServer server;
+    protected Server server;
 
     protected static final String TEST_KEYSPACE = "spark_test";
     private static final String TEST_TABLE_PREFIX = "testtable";
@@ -80,90 +85,35 @@ public abstract class IntegrationTestBase
     @BeforeEach
     void setup(AbstractCassandraTestContext cassandraTestContext) throws InterruptedException
     {
-        sidecarTestContext = CassandraSidecarTestContext.from(cassandraTestContext, new DnsResolver()
-        {
-            Map<String, String> ipToHost = new HashMap<>()
-            {
-                {
-                    put("127.0.0.1", "localhost");
-                    put("127.0.0.2", "localhost2");
-                    put("127.0.0.3", "localhost3");
-                    put("127.0.0.4", "localhost4");
-                    put("127.0.0.5", "localhost5");
-                    put("127.0.0.6", "localhost6");
-                    put("127.0.0.7", "localhost7");
-                    put("127.0.0.8", "localhost8");
-                    put("127.0.0.9", "localhost9");
-                    put("127.0.0.10", "localhost10");
-                    put("127.0.0.11", "localhost11");
-                    put("127.0.0.12", "localhost12");
-                    put("127.0.0.13", "localhost13");
-                    put("127.0.0.14", "localhost14");
-                    put("127.0.0.15", "localhost15");
-                    put("127.0.0.16", "localhost16");
-                    put("127.0.0.17", "localhost17");
-                    put("127.0.0.18", "localhost18");
-                    put("127.0.0.19", "localhost19");
-                }
-            };
-            Map<String, String> hostToIp = new HashMap<>()
-            {{
-                put("localhost", "127.0.0.1");
-                put("localhost2", "127.0.0.2");
-                put("localhost3", "127.0.0.3");
-                put("localhost4", "127.0.0.4");
-                put("localhost5", "127.0.0.5");
-                put("localhost6", "127.0.0.6");
-                put("localhost7", "127.0.0.7");
-                put("localhost8", "127.0.0.8");
-                put("localhost9", "127.0.0.9");
-                put("localhost10", "127.0.0.10");
-                put("localhost11", "127.0.0.11");
-                put("localhost12", "127.0.0.12");
-                put("localhost13", "127.0.0.13");
-                put("localhost14", "127.0.0.14");
-                put("localhost15", "127.0.0.15");
-                put("localhost16", "127.0.0.16");
-                put("localhost17", "127.0.0.17");
-                put("localhost18", "127.0.0.18");
-                put("localhost19", "127.0.0.19");
-            }};
-
-            @Override
-            public String resolve(String s)
-            {
-                if (hostToIp.containsKey(s))
-                {
-                    return hostToIp.get(s);
-                }
-                return ipToHost.get(s);
-            }
-
-            @Override
-            public String reverseResolve(String s)
-            {
-                if (ipToHost.containsKey(s))
-                {
-                    return ipToHost.get(s);
-                }
-                return hostToIp.get(s);
-            }
-        });
-        Injector injector = Guice.createInjector(Modules
-                                                 .override(new MainModule())
-                                                 .with(new IntegrationTestModule(this.sidecarTestContext)));
-        server = injector.getInstance(HttpServer.class);
+        IntegrationTestModule integrationTestModule = new IntegrationTestModule();
+        Injector injector = Guice.createInjector(Modules.override(new MainModule()).with(integrationTestModule));
         vertx = injector.getInstance(Vertx.class);
+        sidecarTestContext = CassandraSidecarTestContext.from(vertx, cassandraTestContext, DnsResolver.DEFAULT);
+        integrationTestModule.setCassandraTestContext(sidecarTestContext);
+
+        server = injector.getInstance(Server.class);
 
         VertxTestContext context = new VertxTestContext();
-        server.listen(0, context.succeeding(p -> {
-            if (sidecarTestContext.isClusterBuilt())
-            {
-                healthCheck(sidecarTestContext.instancesConfig());
-            }
-            sidecarTestContext.registerInstanceConfigListener(IntegrationTestBase::healthCheck);
-            context.completeNow();
-        }));
+
+        if (sidecarTestContext.isClusterBuilt())
+        {
+            MessageConsumer<Object> cqlReadyConsumer = vertx.eventBus().localConsumer(ON_CASSANDRA_CQL_READY.address());
+            cqlReadyConsumer.handler(message -> {
+                cqlReadyConsumer.unregister();
+                context.completeNow();
+            });
+        }
+
+        server.start()
+              .onSuccess(s -> {
+                  logger.info("Started Sidecar on port={}", server.actualPort());
+                  sidecarTestContext.registerInstanceConfigListener(this::healthCheck);
+                  if (!sidecarTestContext.isClusterBuilt())
+                  {
+                      context.completeNow();
+                  }
+              })
+              .onFailure(context::failNow);
 
         context.awaitCompletion(5, TimeUnit.SECONDS);
     }
@@ -171,9 +121,8 @@ public abstract class IntegrationTestBase
     @AfterEach
     void tearDown() throws InterruptedException
     {
-        final CountDownLatch closeLatch = new CountDownLatch(1);
-        server.close(res -> closeLatch.countDown());
-        vertx.close();
+        CountDownLatch closeLatch = new CountDownLatch(1);
+        server.close().onSuccess(res -> closeLatch.countDown());
         if (closeLatch.await(60, TimeUnit.SECONDS))
         {
             logger.info("Close event received before timeout.");
@@ -188,11 +137,26 @@ public abstract class IntegrationTestBase
     protected void testWithClient(VertxTestContext context, Consumer<WebClient> tester) throws Exception
     {
         WebClient client = WebClient.create(vertx);
+        CassandraAdapterDelegate delegate = sidecarTestContext.instancesConfig()
+                                                              .instanceFromId(1)
+                                                              .delegate();
 
-        tester.accept(client);
+        if (delegate.isUp())
+        {
+            tester.accept(client);
+        }
+        else
+        {
+            vertx.eventBus().localConsumer(ON_CASSANDRA_CQL_READY.address(), (Message<JsonObject> message) -> {
+                if (message.body().getInteger("cassandraInstanceId") == 1)
+                {
+                    tester.accept(client);
+                }
+            });
+        }
 
         // wait until the test completes
-        Assertions.assertThat(context.awaitCompletion(30, TimeUnit.SECONDS)).isTrue();
+        Assertions.assertThat(context.awaitCompletion(2, TimeUnit.MINUTES)).isTrue();
     }
 
     protected void createTestKeyspace()
@@ -256,7 +220,7 @@ public abstract class IntegrationTestBase
         }
     }
 
-    private static void healthCheck(InstancesConfig instancesConfig)
+    private void healthCheck(InstancesConfig instancesConfig)
     {
         instancesConfig.instances()
                        .forEach(instanceMetadata -> instanceMetadata.delegate().healthCheck());
@@ -264,7 +228,7 @@ public abstract class IntegrationTestBase
 
     /**
      * Waits for the specified keyspace/table to be available.
-     * Emperically, this loop usually executes either zero or one time before completing.
+     * Empirically, this loop usually executes either zero or one time before completing.
      * However, we set a fairly high number of retries to account for variability in build machines.
      *
      * @param keyspaceName the keyspace for which to wait

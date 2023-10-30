@@ -52,6 +52,15 @@ public interface JobInfo extends Serializable
 
     boolean skipExtendedVerify();
 
-    String getFullTableName();
+    String keyspace();
+
+    String tableName();
+
+    @NotNull
+    default String getFullTableName()
+    {
+        return keyspace() + "." + tableName();
+    }
+
     boolean getSkipClean();
 }

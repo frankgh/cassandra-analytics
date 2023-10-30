@@ -52,7 +52,7 @@ class LeavingBaseTest extends ResiliencyTestBase
                                 boolean isFailure)
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
-        QualifiedTableName table = null;
+        QualifiedTableName table;
         try
         {
             IUpgradeableInstance seed = cluster.get(1);

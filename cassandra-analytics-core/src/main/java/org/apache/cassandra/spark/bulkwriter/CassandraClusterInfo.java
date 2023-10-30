@@ -39,7 +39,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Range;
-import com.google.common.net.HostAndPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -473,10 +472,12 @@ public class CassandraClusterInfo implements ClusterInfo, Closeable
             {
                 // For each writeReplica, get metadata and update map to include range
                 dcReplicaEntry.getValue().forEach(ipAddress -> {
-                    HostAndPort hap = HostAndPort.fromString(ipAddress);
                     // Get metadata for this IP; Create RingInstance
+                    // TODO: Temporary change to extract IP from 'ip:port' string. THis will go oway once
+                    // corresponding change in sidecar is merged.
                     ReplicaMetadata replica = replicaMetadata.stream()
-                                                             .filter(r -> r.address().equals(hap.getHostText()))
+                                                             .filter(r ->
+                                                                     r.address().equals(ipAddress.split(":")[0]))
                                                              .findFirst().get();
                     instanceToRangeMap.put(new RingInstance(replica), range);
                 });

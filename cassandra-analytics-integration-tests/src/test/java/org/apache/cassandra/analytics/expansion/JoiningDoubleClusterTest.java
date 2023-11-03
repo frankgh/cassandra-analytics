@@ -27,6 +27,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -42,14 +43,16 @@ import org.apache.cassandra.utils.Shared;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
+
 @ExtendWith(VertxExtension.class)
 public class JoiningDoubleClusterTest extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperDoubleClusterSize.reset();
-        runJoiningTestScenario(cassandraTestContext,
+        runJoiningTestScenario(context,
+                               cassandraTestContext,
                                BBHelperDoubleClusterSize::install,
                                BBHelperDoubleClusterSize.transientStateStart,
                                BBHelperDoubleClusterSize.transientStateEnd,
@@ -59,10 +62,11 @@ public class JoiningDoubleClusterTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperDoubleClusterSizeFailure.reset();
-        runJoiningTestScenario(cassandraTestContext,
+        runJoiningTestScenario(context,
+                               cassandraTestContext,
                                BBHelperDoubleClusterSizeFailure::install,
                                BBHelperDoubleClusterSizeFailure.transientStateStart,
                                BBHelperDoubleClusterSizeFailure.transientStateEnd,
@@ -72,10 +76,11 @@ public class JoiningDoubleClusterTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperDoubleClusterSize.reset();
-        runJoiningTestScenario(cassandraTestContext,
+        runJoiningTestScenario(context,
+                               cassandraTestContext,
                                BBHelperDoubleClusterSize::install,
                                BBHelperDoubleClusterSize.transientStateStart,
                                BBHelperDoubleClusterSize.transientStateEnd,
@@ -85,10 +90,11 @@ public class JoiningDoubleClusterTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperDoubleClusterSizeFailure.reset();
-        runJoiningTestScenario(cassandraTestContext,
+        runJoiningTestScenario(context,
+                               cassandraTestContext,
                                BBHelperDoubleClusterSizeFailure::install,
                                BBHelperDoubleClusterSizeFailure.transientStateStart,
                                BBHelperDoubleClusterSizeFailure.transientStateEnd,

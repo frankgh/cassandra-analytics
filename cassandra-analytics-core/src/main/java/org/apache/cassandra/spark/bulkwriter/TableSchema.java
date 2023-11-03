@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.spark.common.schema.ColumnType;
 import org.apache.spark.sql.types.StructType;
+import org.jetbrains.annotations.NotNull;
 
 public class TableSchema implements Serializable
 {
@@ -94,6 +95,12 @@ public class TableSchema implements Serializable
     }
 
     public Object[] getKeyColumns(Object[] allColumns)
+    {
+        return getKeyColumns(allColumns, keyFieldPositions);
+    }
+
+    @NotNull
+    public static Object[] getKeyColumns(Object[] allColumns, List<Integer> keyFieldPositions)
     {
         Object[] result = new Object[keyFieldPositions.size()];
         for (int keyFieldPosition = 0; keyFieldPosition < keyFieldPositions.size(); keyFieldPosition++)

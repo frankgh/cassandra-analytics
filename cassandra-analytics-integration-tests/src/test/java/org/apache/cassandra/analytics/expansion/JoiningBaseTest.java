@@ -29,6 +29,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Session;
+import io.vertx.junit5.VertxTestContext;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.analytics.TestTokenSupplier;
@@ -45,13 +46,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class JoiningBaseTest extends ResiliencyTestBase
 {
-    void runJoiningTestScenario(CountDownLatch transientStateStart,
+
+    void runJoiningTestScenario(VertxTestContext context,
+                                CountDownLatch transientStateStart,
                                 CountDownLatch transientStateEnd,
                                 UpgradeableCluster cluster,
                                 boolean isCrossDCKeyspace,
                                 ConsistencyLevel readCL,
                                 ConsistencyLevel writeCL,
-                                boolean isFailure)
+                                boolean isFailure) throws Exception
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         QualifiedTableName table = null;
@@ -91,10 +94,15 @@ public class JoiningBaseTest extends ResiliencyTestBase
             if (!isFailure)
             {
                 table = bulkWriteData(isCrossDCKeyspace, writeCL);
-                assertNotNull(table);
                 Session session = maybeGetSession();
+                assertNotNull(table);
                 validateData(session, table.tableName(), readCL);
+                validateTransientNodeData(context, table, newInstances);
             }
+        }
+        catch (Exception e)
+        {
+            throw new RuntimeException(e);
         }
         finally
         {
@@ -107,10 +115,8 @@ public class JoiningBaseTest extends ResiliencyTestBase
             }
         }
 
-        /**
-         * We fail after triggering bulk writer job. We want to make sure that read validation clears if the
-         * if failure happens in transient node
-         */
+        // We fail after triggering bulk writer job. We want to make sure that read validation clears if the
+        // if failure happens in transient node
         if (isFailure)
         {
             table = bulkWriteData(isCrossDCKeyspace, writeCL);
@@ -121,6 +127,7 @@ public class JoiningBaseTest extends ResiliencyTestBase
             assertNotNull(table);
             Session session = maybeGetSession();
             validateData(session, table.tableName(), readCL);
+            validateTransientNodeData(context, table, newInstances);
 
             for (IUpgradeableInstance joiningNode : newInstances)
             {
@@ -132,7 +139,84 @@ public class JoiningBaseTest extends ResiliencyTestBase
         }
     }
 
-    void runJoiningTestScenario(ConfigurableCassandraTestContext cassandraTestContext,
+    // TODO: Remove
+//    void runJoiningTestScenario(CountDownLatch transientStateStart,
+//                                CountDownLatch transientStateEnd,
+//                                UpgradeableCluster cluster,
+//                                boolean isCrossDCKeyspace,
+//                                ConsistencyLevel readCL,
+//                                ConsistencyLevel writeCL,
+//                                boolean isFailure)
+//    {
+//        CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
+//        QualifiedTableName table = null;
+//        try
+//        {
+//            IUpgradeableInstance seed = cluster.get(1);
+//
+//            List<IUpgradeableInstance> newInstances = new ArrayList<>();
+//            // Go over new nodes and add them once for each DC
+//            for (int i = 0; i < annotation.newNodesPerDc(); i++)
+//            {
+//                int dcNodeIdx = 1; // Use node 2's DC
+//                for (int dc = 1; dc <= annotation.numDcs(); dc++)
+//                {
+//                    IUpgradeableInstance dcNode = cluster.get(dcNodeIdx++);
+//                    IUpgradeableInstance newInstance = ClusterUtils.addInstance(cluster,
+//                                                                                dcNode.config().localDatacenter(),
+//                                                                                dcNode.config().localRack(),
+//                                                                                inst -> {
+//                                                                                    inst.set("auto_bootstrap", true);
+//                                                                                    inst.with(Feature.GOSSIP,
+//                                                                                              Feature.JMX,
+//                                                                                              Feature.NATIVE_PROTOCOL);
+//                                                                                });
+//                    new Thread(() -> newInstance.startup(cluster)).start();
+//                    newInstances.add(newInstance);
+//                }
+//            }
+//
+//            Uninterruptibles.awaitUninterruptibly(transientStateStart, 2, TimeUnit.MINUTES);
+//
+//            for (IUpgradeableInstance newInstance : newInstances)
+//            {
+//                ClusterUtils.awaitRingState(seed, newInstance, "Joining");
+//            }
+//
+//            if (!isFailure)
+//            {
+//
+//
+//                table = bulkWriteData(isCrossDCKeyspace, writeCL);
+//                Session session = maybeGetSession();
+//                assertNotNull(table);
+//                validateData(session, table.tableName(), readCL);
+//            }
+//        }
+//        finally
+//        {
+//            if (!isFailure)
+//            {
+//                for (int i = 0; i < (annotation.newNodesPerDc() * annotation.numDcs()); i++)
+//                {
+//                    transientStateEnd.countDown();
+//                }
+//            }
+//        }
+//
+//        if (isFailure)
+//        {
+//            table = bulkWriteData(isCrossDCKeyspace, writeCL, transientStateEnd);
+//            Session session = maybeGetSession();
+//            assertNotNull(table);
+//            validateData(session, table.tableName(), readCL);
+//            // TODO: join node not part of cluster
+//            // TODO: transient join node to have the data ?
+//        }
+//    }
+
+    void runJoiningTestScenario(VertxTestContext context,
+                                ConfigurableCassandraTestContext cassandraTestContext,
                                 BiConsumer<ClassLoader, Integer> instanceInitializer,
                                 CountDownLatch transientStateStart,
                                 CountDownLatch transientStateEnd,
@@ -153,7 +237,8 @@ public class JoiningBaseTest extends ResiliencyTestBase
             builder.withTokenSupplier(tokenSupplier);
         });
 
-        runJoiningTestScenario(transientStateStart,
+        runJoiningTestScenario(context,
+                               transientStateStart,
                                transientStateEnd,
                                cluster,
                                true,

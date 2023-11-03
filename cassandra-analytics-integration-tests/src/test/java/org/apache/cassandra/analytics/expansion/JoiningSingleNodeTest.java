@@ -24,7 +24,11 @@ import java.util.concurrent.CountDownLatch;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
+import org.junit.jupiter.api.extension.ExtendWith;
+
 import com.datastax.driver.core.ConsistencyLevel;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -40,13 +44,15 @@ import org.apache.cassandra.utils.Shared;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
+@ExtendWith(VertxExtension.class)
 public class JoiningSingleNodeTest extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void oneReadALLWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void oneReadALLWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperSingleJoiningNode.reset();
-        runJoiningTestScenario(cassandraTestContext,
+        runJoiningTestScenario(context,
+                               cassandraTestContext,
                                BBHelperSingleJoiningNode::install,
                                BBHelperSingleJoiningNode.transientStateStart,
                                BBHelperSingleJoiningNode.transientStateEnd,
@@ -56,10 +62,11 @@ public class JoiningSingleNodeTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void oneReadALLWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void oneReadALLWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperSingleJoiningNodeFailure.reset();
-        runJoiningTestScenario(cassandraTestContext,
+        runJoiningTestScenario(context,
+                               cassandraTestContext,
                                BBHelperSingleJoiningNodeFailure::install,
                                BBHelperSingleJoiningNodeFailure.transientStateStart,
                                BBHelperSingleJoiningNodeFailure.transientStateEnd,
@@ -69,10 +76,11 @@ public class JoiningSingleNodeTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperSingleJoiningNode.reset();
-        runJoiningTestScenario(cassandraTestContext,
+        runJoiningTestScenario(context,
+                               cassandraTestContext,
                                BBHelperSingleJoiningNode::install,
                                BBHelperSingleJoiningNode.transientStateStart,
                                BBHelperSingleJoiningNode.transientStateEnd,
@@ -82,10 +90,11 @@ public class JoiningSingleNodeTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperSingleJoiningNodeFailure.reset();
-        runJoiningTestScenario(cassandraTestContext,
+        runJoiningTestScenario(context,
+                               cassandraTestContext,
                                BBHelperSingleJoiningNodeFailure::install,
                                BBHelperSingleJoiningNodeFailure.transientStateStart,
                                BBHelperSingleJoiningNodeFailure.transientStateEnd,

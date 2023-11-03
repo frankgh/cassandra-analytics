@@ -27,6 +27,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -46,11 +47,12 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 public class JoiningMultipleNodesTest extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context)
     throws Exception
     {
         BBHelperMultipleJoiningNodes.reset();
-        runJoiningTestScenario(cassandraTestContext,
+        runJoiningTestScenario(context,
+                               cassandraTestContext,
                                BBHelperMultipleJoiningNodes::install,
                                BBHelperMultipleJoiningNodes.transientStateStart,
                                BBHelperMultipleJoiningNodes.transientStateEnd,
@@ -60,11 +62,12 @@ public class JoiningMultipleNodesTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context)
     throws Exception
     {
         BBHelperMultipleJoiningNodesFailure.reset();
-        runJoiningTestScenario(cassandraTestContext,
+        runJoiningTestScenario(context,
+                               cassandraTestContext,
                                BBHelperMultipleJoiningNodesFailure::install,
                                BBHelperMultipleJoiningNodesFailure.transientStateStart,
                                BBHelperMultipleJoiningNodesFailure.transientStateEnd,
@@ -74,11 +77,12 @@ public class JoiningMultipleNodesTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context)
     throws Exception
     {
         BBHelperMultipleJoiningNodes.reset();
-        runJoiningTestScenario(cassandraTestContext,
+        runJoiningTestScenario(context,
+                               cassandraTestContext,
                                BBHelperMultipleJoiningNodes::install,
                                BBHelperMultipleJoiningNodes.transientStateStart,
                                BBHelperMultipleJoiningNodes.transientStateEnd,
@@ -88,11 +92,12 @@ public class JoiningMultipleNodesTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context)
     throws Exception
     {
         BBHelperMultipleJoiningNodesFailure.reset();
-        runJoiningTestScenario(cassandraTestContext,
+        runJoiningTestScenario(context,
+                               cassandraTestContext,
                                BBHelperMultipleJoiningNodesFailure::install,
                                BBHelperMultipleJoiningNodesFailure.transientStateStart,
                                BBHelperMultipleJoiningNodesFailure.transientStateEnd,

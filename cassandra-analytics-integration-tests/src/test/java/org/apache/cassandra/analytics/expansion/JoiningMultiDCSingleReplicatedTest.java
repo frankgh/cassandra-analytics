@@ -27,6 +27,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -47,12 +48,13 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 public class JoiningMultiDCSingleReplicatedTest extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void allReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void allReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperMultiDC.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext);
 
-        runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
+        runJoiningTestScenario(context,
+                               BBHelperMultiDC.transientStateStart,
                                BBHelperMultiDC.transientStateEnd,
                                cluster,
                                false,
@@ -62,12 +64,13 @@ public class JoiningMultiDCSingleReplicatedTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void allReadOneWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void allReadOneWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperMultiDCFailure.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDCFailure::install, cassandraTestContext);
 
-        runJoiningTestScenario(BBHelperMultiDCFailure.transientStateStart,
+        runJoiningTestScenario(context,
+                               BBHelperMultiDCFailure.transientStateStart,
                                BBHelperMultiDCFailure.transientStateEnd,
                                cluster,
                                false,
@@ -77,12 +80,13 @@ public class JoiningMultiDCSingleReplicatedTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void localQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void localQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperMultiDC.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext);
 
-        runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
+        runJoiningTestScenario(context,
+                               BBHelperMultiDC.transientStateStart,
                                BBHelperMultiDC.transientStateEnd,
                                cluster,
                                false,
@@ -92,12 +96,13 @@ public class JoiningMultiDCSingleReplicatedTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void localQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void localQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperMultiDCFailure.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDCFailure::install, cassandraTestContext);
 
-        runJoiningTestScenario(BBHelperMultiDCFailure.transientStateStart,
+        runJoiningTestScenario(context,
+                               BBHelperMultiDCFailure.transientStateStart,
                                BBHelperMultiDCFailure.transientStateEnd,
                                cluster,
                                false,
@@ -107,12 +112,13 @@ public class JoiningMultiDCSingleReplicatedTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void eachQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void eachQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperMultiDC.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext);
 
-        runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
+        runJoiningTestScenario(context,
+                               BBHelperMultiDC.transientStateStart,
                                BBHelperMultiDC.transientStateEnd,
                                cluster,
                                false,
@@ -122,12 +128,13 @@ public class JoiningMultiDCSingleReplicatedTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void eachQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void eachQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperMultiDCFailure.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDCFailure::install, cassandraTestContext);
 
-        runJoiningTestScenario(BBHelperMultiDCFailure.transientStateStart,
+        runJoiningTestScenario(context,
+                               BBHelperMultiDCFailure.transientStateStart,
                                BBHelperMultiDCFailure.transientStateEnd,
                                cluster,
                                false,
@@ -137,12 +144,13 @@ public class JoiningMultiDCSingleReplicatedTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperMultiDC.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext);
 
-        runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
+        runJoiningTestScenario(context,
+                               BBHelperMultiDC.transientStateStart,
                                BBHelperMultiDC.transientStateEnd,
                                cluster,
                                false,
@@ -152,12 +160,13 @@ public class JoiningMultiDCSingleReplicatedTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperMultiDCFailure.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDCFailure::install, cassandraTestContext);
 
-        runJoiningTestScenario(BBHelperMultiDCFailure.transientStateStart,
+        runJoiningTestScenario(context,
+                               BBHelperMultiDCFailure.transientStateStart,
                                BBHelperMultiDCFailure.transientStateEnd,
                                cluster,
                                false,

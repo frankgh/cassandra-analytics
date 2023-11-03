@@ -89,10 +89,8 @@ class LeavingBaseTest extends ResiliencyTestBase
             }
         }
 
-        /**
-         * We fail after triggering bulk writer job. We want to make sure that read validation clears if the
-         * if failure happens in transient node
-         */
+        // We fail after triggering bulk writer job. We want to make sure that read validation clears if the
+        // if failure happens in transient node
         if (isFailure)
         {
             table = bulkWriteData(annotation.numDcs() > 1, writeCL);

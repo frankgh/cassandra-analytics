@@ -19,6 +19,7 @@
 package org.apache.cassandra.sidecar.testing;
 
 import java.io.IOException;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -30,6 +31,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -59,9 +62,9 @@ import org.apache.cassandra.sidecar.common.dns.DnsResolver;
 import org.apache.cassandra.sidecar.server.MainModule;
 import org.apache.cassandra.sidecar.server.Server;
 import org.apache.cassandra.testing.AbstractCassandraTestContext;
-import org.assertj.core.api.Assertions;
 
 import static org.apache.cassandra.sidecar.server.SidecarServerEvents.ON_CASSANDRA_CQL_READY;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Base class for integration test.
@@ -89,75 +92,7 @@ public abstract class IntegrationTestBase
         IntegrationTestModule integrationTestModule = new IntegrationTestModule();
         Injector injector = Guice.createInjector(Modules.override(new MainModule()).with(integrationTestModule));
         vertx = injector.getInstance(Vertx.class);
-        sidecarTestContext = CassandraSidecarTestContext.from(vertx, cassandraTestContext, new DnsResolver()
-        {
-            Map<String, String> ipToHost = new HashMap<>()
-            {
-                {
-                    put("127.0.0.1", "localhost");
-                    put("127.0.0.2", "localhost2");
-                    put("127.0.0.3", "localhost3");
-                    put("127.0.0.4", "localhost4");
-                    put("127.0.0.5", "localhost5");
-                    put("127.0.0.6", "localhost6");
-                    put("127.0.0.7", "localhost7");
-                    put("127.0.0.8", "localhost8");
-                    put("127.0.0.9", "localhost9");
-                    put("127.0.0.10", "localhost10");
-                    put("127.0.0.11", "localhost11");
-                    put("127.0.0.12", "localhost12");
-                    put("127.0.0.13", "localhost13");
-                    put("127.0.0.14", "localhost14");
-                    put("127.0.0.15", "localhost15");
-                    put("127.0.0.16", "localhost16");
-                    put("127.0.0.17", "localhost17");
-                    put("127.0.0.18", "localhost18");
-                    put("127.0.0.19", "localhost19");
-                }
-            };
-            Map<String, String> hostToIp = new HashMap<>()
-            {{
-                put("localhost", "127.0.0.1");
-                put("localhost2", "127.0.0.2");
-                put("localhost3", "127.0.0.3");
-                put("localhost4", "127.0.0.4");
-                put("localhost5", "127.0.0.5");
-                put("localhost6", "127.0.0.6");
-                put("localhost7", "127.0.0.7");
-                put("localhost8", "127.0.0.8");
-                put("localhost9", "127.0.0.9");
-                put("localhost10", "127.0.0.10");
-                put("localhost11", "127.0.0.11");
-                put("localhost12", "127.0.0.12");
-                put("localhost13", "127.0.0.13");
-                put("localhost14", "127.0.0.14");
-                put("localhost15", "127.0.0.15");
-                put("localhost16", "127.0.0.16");
-                put("localhost17", "127.0.0.17");
-                put("localhost18", "127.0.0.18");
-                put("localhost19", "127.0.0.19");
-            }};
-
-            @Override
-            public String resolve(String s)
-            {
-                if (hostToIp.containsKey(s))
-                {
-                    return hostToIp.get(s);
-                }
-                return ipToHost.get(s);
-            }
-
-            @Override
-            public String reverseResolve(String s)
-            {
-                if (ipToHost.containsKey(s))
-                {
-                    return ipToHost.get(s);
-                }
-                return hostToIp.get(s);
-            }
-        });
+        sidecarTestContext = CassandraSidecarTestContext.from(vertx, cassandraTestContext, new FastDnsResolver());
         integrationTestModule.setCassandraTestContext(sidecarTestContext);
 
         server = injector.getInstance(Server.class);
@@ -225,7 +160,7 @@ public abstract class IntegrationTestBase
         }
 
         // wait until the test completes
-        Assertions.assertThat(context.awaitCompletion(2, TimeUnit.MINUTES)).isTrue();
+        assertThat(context.awaitCompletion(2, TimeUnit.MINUTES)).isTrue();
     }
 
     protected void createTestKeyspace()
@@ -257,7 +192,7 @@ public abstract class IntegrationTestBase
     protected Session maybeGetSession()
     {
         Session session = sidecarTestContext.session();
-        Assertions.assertThat(session).isNotNull();
+        assertThat(session).isNotNull();
         return session;
     }
 
@@ -332,5 +267,85 @@ public abstract class IntegrationTestBase
         throw new RuntimeException(
         String.format("Keyspace/table %s/%s did not become visible on all sidecar instances",
                       keyspaceName, tableName));
+    }
+
+    /**
+     * A {@link DnsResolver} instance used for tests that provides fast DNS resolution, to avoid blocking
+     * DNS resolution at the JDK/OS-level.
+     *
+     * <p><b>NOTE:</b> The resolver assumes that the addresses are of the form 127.0.0.x, which is what is currently
+     * configured for integration tests.
+     */
+    static class FastDnsResolver implements DnsResolver
+    {
+        private static final Logger LOGGER = LoggerFactory.getLogger(FastDnsResolver.class);
+        private static final Pattern HOSTNAME_PATTERN = Pattern.compile("^localhost(\\d+)?$");
+        private final DnsResolver delegate;
+
+        FastDnsResolver()
+        {
+            this(DnsResolver.DEFAULT);
+        }
+
+        FastDnsResolver(DnsResolver delegate)
+        {
+
+            this.delegate = delegate;
+        }
+
+        /**
+         * Returns the resolved IP address from the hostname. If the {@code hostname} pattern is not matched,
+         * delegate the resolution to the delegate resolver.
+         *
+         * <pre>
+         * resolver.resolve("localhost") = "127.0.0.1"
+         * resolver.resolve("localhost2") = "127.0.0.2"
+         * resolver.resolve("localhost20") = "127.0.0.20"
+         * resolver.resolve("127.0.0.5") = "127.0.0.5"
+         * </pre>
+         *
+         * @param hostname the hostname to resolve
+         * @return the resolved IP address
+         */
+        @Override
+        public String resolve(String hostname) throws UnknownHostException
+        {
+            Matcher matcher = HOSTNAME_PATTERN.matcher(hostname);
+            if (!matcher.matches())
+            {
+                LOGGER.warn("Invalid hostname found {}.", hostname);
+                return delegate.resolve(hostname);
+            }
+            String group = matcher.group(1);
+            return "127.0.0." + (group != null ? group : "1");
+        }
+
+        /**
+         * Returns the resolved hostname from the given {@code address}. When an invalid IP address is provided,
+         * delegates {@code address} resolution to the delegate.
+         *
+         * <pre>
+         * resolver.reverseResolve("127.0.0.1") = "localhost"
+         * resolver.reverseResolve("127.0.0.2") = "localhost2"
+         * resolver.reverseResolve("127.0.0.20") = "localhost20"
+         * resolver.reverseResolve("localhost5") = "localhost5"
+         * </pre>
+         *
+         * @param address the IP address to perform the reverse resolution
+         * @return the resolved hostname for the given {@code address}
+         */
+        @Override
+        public String reverseResolve(String address) throws UnknownHostException
+        {
+            // IP addresses have the form 127.0.0.x
+            int lastDotIndex = address.lastIndexOf('.');
+            if (lastDotIndex < 0 || lastDotIndex + 1 == address.length())
+            {
+                LOGGER.warn("Invalid ip address found {}.", address);
+                return delegate.reverseResolve(address);
+            }
+            String netNumber = address.substring(lastDotIndex + 1);
+            return "1".equals(netNumber) ? "localhost" : "localhost" + netNumber;
+        }
     }
 }

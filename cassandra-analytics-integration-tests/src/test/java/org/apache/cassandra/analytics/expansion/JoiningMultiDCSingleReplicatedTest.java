@@ -44,11 +44,10 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
 @ExtendWith(VertxExtension.class)
-public class JoiningTestMultiDC extends JoiningBaseTest
+public class JoiningMultiDCSingleReplicatedTest extends JoiningBaseTest
 {
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void allReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext)
-    throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void allReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMultiDC.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext);
@@ -56,15 +55,14 @@ public class JoiningTestMultiDC extends JoiningBaseTest
         runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
                                BBHelperMultiDC.transientStateEnd,
                                cluster,
-                               true,
+                               false,
                                ConsistencyLevel.ALL,
                                ConsistencyLevel.ONE,
                                false);
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void allReadOneWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
-    throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void allReadOneWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMultiDCFailure.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDCFailure::install, cassandraTestContext);
@@ -72,15 +70,14 @@ public class JoiningTestMultiDC extends JoiningBaseTest
         runJoiningTestScenario(BBHelperMultiDCFailure.transientStateStart,
                                BBHelperMultiDCFailure.transientStateEnd,
                                cluster,
-                               true,
+                               false,
                                ConsistencyLevel.ALL,
                                ConsistencyLevel.ONE,
                                true);
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void localQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
-    throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void localQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMultiDC.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext);
@@ -88,15 +85,14 @@ public class JoiningTestMultiDC extends JoiningBaseTest
         runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
                                BBHelperMultiDC.transientStateEnd,
                                cluster,
-                               true,
+                               false,
                                ConsistencyLevel.LOCAL_QUORUM,
                                ConsistencyLevel.LOCAL_QUORUM,
                                false);
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void localQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
-    throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void localQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMultiDCFailure.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDCFailure::install, cassandraTestContext);
@@ -104,15 +100,14 @@ public class JoiningTestMultiDC extends JoiningBaseTest
         runJoiningTestScenario(BBHelperMultiDCFailure.transientStateStart,
                                BBHelperMultiDCFailure.transientStateEnd,
                                cluster,
-                               true,
+                               false,
                                ConsistencyLevel.LOCAL_QUORUM,
                                ConsistencyLevel.LOCAL_QUORUM,
                                true);
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void eachQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
-    throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void eachQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMultiDC.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext);
@@ -120,15 +115,14 @@ public class JoiningTestMultiDC extends JoiningBaseTest
         runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
                                BBHelperMultiDC.transientStateEnd,
                                cluster,
-                               true,
+                               false,
                                ConsistencyLevel.EACH_QUORUM,
                                ConsistencyLevel.LOCAL_QUORUM,
                                false);
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void eachQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
-    throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void eachQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMultiDCFailure.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDCFailure::install, cassandraTestContext);
@@ -136,15 +130,14 @@ public class JoiningTestMultiDC extends JoiningBaseTest
         runJoiningTestScenario(BBHelperMultiDCFailure.transientStateStart,
                                BBHelperMultiDCFailure.transientStateEnd,
                                cluster,
-                               true,
+                               false,
                                ConsistencyLevel.EACH_QUORUM,
                                ConsistencyLevel.LOCAL_QUORUM,
                                true);
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
-    throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMultiDC.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext);
@@ -152,47 +145,14 @@ public class JoiningTestMultiDC extends JoiningBaseTest
         runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
                                BBHelperMultiDC.transientStateEnd,
                                cluster,
-                               true,
-                               ConsistencyLevel.QUORUM,
-                               ConsistencyLevel.QUORUM,
-                               false);
-    }
-
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
-    throws Exception
-    {
-        BBHelperMultiDCFailure.reset();
-        UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDCFailure::install, cassandraTestContext);
-
-        runJoiningTestScenario(BBHelperMultiDCFailure.transientStateStart,
-                               BBHelperMultiDCFailure.transientStateEnd,
-                               cluster,
-                               true,
-                               ConsistencyLevel.QUORUM,
-                               ConsistencyLevel.QUORUM,
-                               true);
-    }
-
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext)
-    throws Exception
-    {
-        BBHelperMultiDC.reset();
-        UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext);
-
-        runJoiningTestScenario(BBHelperMultiDC.transientStateStart,
-                               BBHelperMultiDC.transientStateEnd,
-                               cluster,
-                               true,
+                               false,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
                                false);
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
-    throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMultiDCFailure.reset();
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDCFailure::install, cassandraTestContext);
@@ -200,7 +160,7 @@ public class JoiningTestMultiDC extends JoiningBaseTest
         runJoiningTestScenario(BBHelperMultiDCFailure.transientStateStart,
                                BBHelperMultiDCFailure.transientStateEnd,
                                cluster,
-                               true,
+                               false,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
                                true);
@@ -212,14 +172,14 @@ public class JoiningTestMultiDC extends JoiningBaseTest
     @Shared
     public static class BBHelperMultiDC
     {
-        static CountDownLatch transientStateStart = new CountDownLatch(6);
-        static CountDownLatch transientStateEnd = new CountDownLatch(6);
+        static CountDownLatch transientStateStart = new CountDownLatch(2);
+        static CountDownLatch transientStateEnd = new CountDownLatch(2);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
-            // Test case involves doubling the size of a 6 node cluster (3 per DC)
-            // We intercept the bootstrap of nodes (7-12) to validate token ranges
-            if (nodeNumber > 6)
+            // Test case involves adding 2 nodes to a 10 node cluster (5 per DC)
+            // We intercept the bootstrap of nodes (11,12) to validate token ranges
+            if (nodeNumber > 10)
             {
                 TypePool typePool = TypePool.Default.of(cl);
                 TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
@@ -246,25 +206,25 @@ public class JoiningTestMultiDC extends JoiningBaseTest
 
         public static void reset()
         {
-            transientStateStart = new CountDownLatch(6);
-            transientStateEnd = new CountDownLatch(6);
+            transientStateStart = new CountDownLatch(2);
+            transientStateEnd = new CountDownLatch(2);
         }
     }
 
     /**
-     * ByteBuddy helper for multiple joining nodes failure scenario in multiDC
+     * ByteBuddy helper for multiple joining nodes failure
      */
     @Shared
     public static class BBHelperMultiDCFailure
     {
-        static CountDownLatch transientStateStart = new CountDownLatch(6);
-        static CountDownLatch transientStateEnd = new CountDownLatch(6);
+        static CountDownLatch transientStateStart = new CountDownLatch(2);
+        static CountDownLatch transientStateEnd = new CountDownLatch(2);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
-            // Test case involves doubling the size of a 6 node cluster (3 per DC)
-            // We intercept the bootstrap of nodes (7-12) to validate token ranges
-            if (nodeNumber > 6)
+            // Test case involves adding 2 nodes to a 10 node cluster (5 per DC)
+            // We intercept the bootstrap of nodes (11,12) to validate token ranges
+            if (nodeNumber > 10)
             {
                 TypePool typePool = TypePool.Default.of(cl);
                 TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
@@ -291,8 +251,8 @@ public class JoiningTestMultiDC extends JoiningBaseTest
 
         public static void reset()
         {
-            transientStateStart = new CountDownLatch(6);
-            transientStateEnd = new CountDownLatch(6);
+            transientStateStart = new CountDownLatch(2);
+            transientStateEnd = new CountDownLatch(2);
         }
     }
 }

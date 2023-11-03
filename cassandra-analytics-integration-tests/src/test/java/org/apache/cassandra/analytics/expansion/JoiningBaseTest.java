@@ -20,11 +20,11 @@ package org.apache.cassandra.analytics.expansion;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
@@ -39,13 +39,9 @@ import org.apache.cassandra.distributed.api.TokenSupplier;
 import org.apache.cassandra.distributed.shared.ClusterUtils;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
-import org.apache.spark.SparkConf;
-import org.apache.spark.sql.DataFrameWriter;
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Row;
-import org.apache.spark.sql.SparkSession;
 
 import static junit.framework.TestCase.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class JoiningBaseTest extends ResiliencyTestBase
 {
@@ -59,11 +55,11 @@ public class JoiningBaseTest extends ResiliencyTestBase
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         QualifiedTableName table = null;
+        List<IUpgradeableInstance> newInstances = new ArrayList<>();
         try
         {
             IUpgradeableInstance seed = cluster.get(1);
 
-            List<IUpgradeableInstance> newInstances = new ArrayList<>();
             // Go over new nodes and add them once for each DC
             for (int i = 0; i < annotation.newNodesPerDc(); i++)
             {
@@ -95,8 +91,8 @@ public class JoiningBaseTest extends ResiliencyTestBase
             if (!isFailure)
             {
                 table = bulkWriteData(isCrossDCKeyspace, writeCL);
-                Session session = maybeGetSession();
                 assertNotNull(table);
+                Session session = maybeGetSession();
                 validateData(session, table.tableName(), readCL);
             }
         }
@@ -111,14 +107,28 @@ public class JoiningBaseTest extends ResiliencyTestBase
             }
         }
 
+        /**
+         * We fail after triggering bulk writer job. We want to make sure that read validation clears if the
+         * if failure happens in transient node
+         */
         if (isFailure)
         {
-            table = bulkWriteData(isCrossDCKeyspace, writeCL, transientStateEnd);
-            Session session = maybeGetSession();
+            table = bulkWriteData(isCrossDCKeyspace, writeCL);
+            for (int i = 0; i < (annotation.newNodesPerDc() * annotation.numDcs()); i++)
+            {
+                transientStateEnd.countDown();
+            }
             assertNotNull(table);
+            Session session = maybeGetSession();
             validateData(session, table.tableName(), readCL);
-            // TODO: join node not part of cluster
-            // TODO: transient join node to have the data ?
+
+            for (IUpgradeableInstance joiningNode : newInstances)
+            {
+                Optional<ClusterUtils.RingInstanceDetails> joiningNodeDetails = getMatchingInstanceFromRing(cluster.get(1), joiningNode.broadcastAddress()
+                                                                                                                                       .getAddress()
+                                                                                                                                       .getHostAddress());
+                joiningNodeDetails.ifPresent(ringInstanceDetails -> assertThat(ringInstanceDetails.getState()).isNotEqualTo("Normal"));
+            }
         }
     }
 
@@ -152,47 +162,12 @@ public class JoiningBaseTest extends ResiliencyTestBase
                                isFailure);
     }
 
-    protected QualifiedTableName bulkWriteData(boolean isCrossDCKeyspace, ConsistencyLevel writeCL, CountDownLatch transientStateEnd)
+    private Optional<ClusterUtils.RingInstanceDetails> getMatchingInstanceFromRing(IUpgradeableInstance seed,
+                                                                                   String ipAddress)
     {
-        CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
-        List<String> sidecarInstances = generateSidecarInstances((annotation.nodesPerDc() + annotation.newNodesPerDc()) * annotation.numDcs());
-
-        ImmutableMap<String, Integer> rf;
-        if (annotation.numDcs() > 1 && isCrossDCKeyspace)
-        {
-            rf = ImmutableMap.of("datacenter1", DEFAULT_RF, "datacenter2", DEFAULT_RF);
-        }
-        else
-        {
-            rf = ImmutableMap.of("datacenter1", DEFAULT_RF);
-        }
-
-        QualifiedTableName schema = initializeSchema(rf);
-
-        SparkConf sparkConf = generateSparkConf();
-        SparkSession spark = generateSparkSession(sparkConf);
-        Dataset<Row> df = generateData(spark);
-
-        DataFrameWriter<Row> dfWriter = df.write()
-                                          .format("org.apache.cassandra.spark.sparksql.CassandraDataSink")
-                                          .option("bulk_writer_cl", writeCL.name())
-                                          .option("local_dc", "datacenter1")
-                                          .option("sidecar_instances", String.join(",", sidecarInstances))
-                                          .option("sidecar_port", String.valueOf(server.actualPort()))
-                                          .option("keyspace", schema.keyspace())
-                                          .option("table", schema.tableName())
-                                          .option("number_splits", "-1")
-                                          .mode("append");
-        if (!isCrossDCKeyspace)
-        {
-            dfWriter.option("local_dc", "datacenter1");
-        }
-
-        for (int i = 0; i < (annotation.newNodesPerDc() * annotation.numDcs()); i++)
-        {
-            transientStateEnd.countDown();
-        }
-        dfWriter.save();
-        return schema;
+        return ClusterUtils.ring(seed)
+                           .stream()
+                           .filter(i -> i.getAddress().equals(ipAddress))
+                           .findFirst();
     }
 }

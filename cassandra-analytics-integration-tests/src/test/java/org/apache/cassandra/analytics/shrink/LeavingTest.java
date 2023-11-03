@@ -288,7 +288,6 @@ class LeavingTest extends LeavingBaseTest
         {
             transientStateStart.countDown();
             Uninterruptibles.awaitUninterruptibly(transientStateEnd);
-            orig.call();
             throw new UnsupportedOperationException("Simulate leave failure");
         }
 
@@ -373,7 +372,6 @@ class LeavingTest extends LeavingBaseTest
         {
             transientStateStart.countDown();
             Uninterruptibles.awaitUninterruptibly(transientStateEnd);
-            orig.call();
             throw new UnsupportedOperationException("Simulate leave failure");
         }
 

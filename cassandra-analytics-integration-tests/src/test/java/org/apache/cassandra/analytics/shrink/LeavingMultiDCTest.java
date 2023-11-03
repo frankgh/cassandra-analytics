@@ -288,7 +288,6 @@ class LeavingMultiDCTest extends LeavingBaseTest
         {
             transientStateStart.countDown();
             Uninterruptibles.awaitUninterruptibly(transientStateEnd);
-            orig.call();
             throw new UnsupportedOperationException("Simulate leave failure");
         }
 

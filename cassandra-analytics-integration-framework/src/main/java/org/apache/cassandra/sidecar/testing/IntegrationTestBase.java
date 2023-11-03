@@ -23,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -88,7 +89,75 @@ public abstract class IntegrationTestBase
         IntegrationTestModule integrationTestModule = new IntegrationTestModule();
         Injector injector = Guice.createInjector(Modules.override(new MainModule()).with(integrationTestModule));
         vertx = injector.getInstance(Vertx.class);
-        sidecarTestContext = CassandraSidecarTestContext.from(vertx, cassandraTestContext, DnsResolver.DEFAULT);
+        sidecarTestContext = CassandraSidecarTestContext.from(vertx, cassandraTestContext, new DnsResolver()
+        {
+            Map<String, String> ipToHost = new HashMap<>()
+            {
+                {
+                    put("127.0.0.1", "localhost");
+                    put("127.0.0.2", "localhost2");
+                    put("127.0.0.3", "localhost3");
+                    put("127.0.0.4", "localhost4");
+                    put("127.0.0.5", "localhost5");
+                    put("127.0.0.6", "localhost6");
+                    put("127.0.0.7", "localhost7");
+                    put("127.0.0.8", "localhost8");
+                    put("127.0.0.9", "localhost9");
+                    put("127.0.0.10", "localhost10");
+                    put("127.0.0.11", "localhost11");
+                    put("127.0.0.12", "localhost12");
+                    put("127.0.0.13", "localhost13");
+                    put("127.0.0.14", "localhost14");
+                    put("127.0.0.15", "localhost15");
+                    put("127.0.0.16", "localhost16");
+                    put("127.0.0.17", "localhost17");
+                    put("127.0.0.18", "localhost18");
+                    put("127.0.0.19", "localhost19");
+                }
+            };
+            Map<String, String> hostToIp = new HashMap<>()
+            {{
+                put("localhost", "127.0.0.1");
+                put("localhost2", "127.0.0.2");
+                put("localhost3", "127.0.0.3");
+                put("localhost4", "127.0.0.4");
+                put("localhost5", "127.0.0.5");
+                put("localhost6", "127.0.0.6");
+                put("localhost7", "127.0.0.7");
+                put("localhost8", "127.0.0.8");
+                put("localhost9", "127.0.0.9");
+                put("localhost10", "127.0.0.10");
+                put("localhost11", "127.0.0.11");
+                put("localhost12", "127.0.0.12");
+                put("localhost13", "127.0.0.13");
+                put("localhost14", "127.0.0.14");
+                put("localhost15", "127.0.0.15");
+                put("localhost16", "127.0.0.16");
+                put("localhost17", "127.0.0.17");
+                put("localhost18", "127.0.0.18");
+                put("localhost19", "127.0.0.19");
+            }};
+
+            @Override
+            public String resolve(String s)
+            {
+                if (hostToIp.containsKey(s))
+                {
+                    return hostToIp.get(s);
+                }
+                return ipToHost.get(s);
+            }
+
+            @Override
+            public String reverseResolve(String s)
+            {
+                if (ipToHost.containsKey(s))
+                {
+                    return ipToHost.get(s);
+                }
+                return hostToIp.get(s);
+            }
+        });
         integrationTestModule.setCassandraTestContext(sidecarTestContext);
 
         server = injector.getInstance(Server.class);

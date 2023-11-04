@@ -28,6 +28,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Session;
+import io.vertx.junit5.VertxTestContext;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.distributed.UpgradeableCluster;
@@ -40,13 +41,14 @@ import static org.junit.Assert.assertTrue;
 
 class LeavingBaseTest extends ResiliencyTestBase
 {
-    void runLeavingTestScenario(int leavingNodesPerDC,
+    void runLeavingTestScenario(VertxTestContext context,
+                                int leavingNodesPerDC,
                                 CountDownLatch transientStateStart,
                                 CountDownLatch transientStateEnd,
                                 UpgradeableCluster cluster,
                                 ConsistencyLevel readCL,
                                 ConsistencyLevel writeCL,
-                                boolean isFailure)
+                                boolean isFailure) throws Exception
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         QualifiedTableName table;
@@ -76,6 +78,7 @@ class LeavingBaseTest extends ResiliencyTestBase
                 Session session = maybeGetSession();
                 assertNotNull(table);
                 validateData(session, table.tableName(), readCL);
+                validateTransientNodeData(context, table, leavingNodes);
             }
         }
         finally
@@ -104,6 +107,7 @@ class LeavingBaseTest extends ResiliencyTestBase
 
             // check leave node are part of cluster when leave fails
             assertTrue(areLeavingNodesPartOfCluster(cluster.get(1), leavingNodes));
+            context.completeNow();
         }
     }
 

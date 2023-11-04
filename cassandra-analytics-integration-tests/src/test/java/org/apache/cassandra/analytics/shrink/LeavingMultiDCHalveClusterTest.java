@@ -26,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -45,13 +46,14 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 class LeavingMultiDCHalveClusterTest extends LeavingBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void allReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void allReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
     {
         BBHelperHalveClusterMultiDC.reset();
         int leavingNodesPerDC = 3;
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperHalveClusterMultiDC::install, cassandraTestContext);
 
-        runLeavingTestScenario(leavingNodesPerDC,
+        runLeavingTestScenario(context,
+                               leavingNodesPerDC,
                                BBHelperHalveClusterMultiDC.transientStateStart,
                                BBHelperHalveClusterMultiDC.transientStateEnd,
                                cluster,
@@ -61,13 +63,15 @@ class LeavingMultiDCHalveClusterTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void allReadOneWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void allReadOneWriteFailure(ConfigurableCassandraTestContext cassandraTestContext,
+                                VertxTestContext context) throws Exception
     {
         BBHelperHalveClusterMultiDCFailure.reset();
         int leavingNodesPerDC = 3;
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperHalveClusterMultiDCFailure::install, cassandraTestContext);
 
-        runLeavingTestScenario(leavingNodesPerDC,
+        runLeavingTestScenario(context,
+                               leavingNodesPerDC,
                                BBHelperHalveClusterMultiDCFailure.transientStateStart,
                                BBHelperHalveClusterMultiDCFailure.transientStateEnd,
                                cluster,
@@ -77,13 +81,15 @@ class LeavingMultiDCHalveClusterTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void localQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void localQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext,
+                                         VertxTestContext context) throws Exception
     {
         BBHelperHalveClusterMultiDC.reset();
         int leavingNodesPerDC = 3;
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperHalveClusterMultiDC::install, cassandraTestContext);
 
-        runLeavingTestScenario(leavingNodesPerDC,
+        runLeavingTestScenario(context,
+                               leavingNodesPerDC,
                                BBHelperHalveClusterMultiDC.transientStateStart,
                                BBHelperHalveClusterMultiDC.transientStateEnd,
                                cluster,
@@ -93,13 +99,15 @@ class LeavingMultiDCHalveClusterTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void localQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void localQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext,
+                                                VertxTestContext context) throws Exception
     {
         BBHelperHalveClusterMultiDCFailure.reset();
         int leavingNodesPerDC = 3;
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperHalveClusterMultiDCFailure::install, cassandraTestContext);
 
-        runLeavingTestScenario(leavingNodesPerDC,
+        runLeavingTestScenario(context,
+                               leavingNodesPerDC,
                                BBHelperHalveClusterMultiDCFailure.transientStateStart,
                                BBHelperHalveClusterMultiDCFailure.transientStateEnd,
                                cluster,
@@ -109,13 +117,15 @@ class LeavingMultiDCHalveClusterTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void localQuorumReadEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void localQuorumReadEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext,
+                                        VertxTestContext context) throws Exception
     {
         BBHelperHalveClusterMultiDC.reset();
         int leavingNodesPerDC = 3;
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperHalveClusterMultiDC::install, cassandraTestContext);
 
-        runLeavingTestScenario(leavingNodesPerDC,
+        runLeavingTestScenario(context,
+                               leavingNodesPerDC,
                                BBHelperHalveClusterMultiDC.transientStateStart,
                                BBHelperHalveClusterMultiDC.transientStateEnd,
                                cluster,
@@ -125,13 +135,15 @@ class LeavingMultiDCHalveClusterTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void localQuorumReadEachQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void localQuorumReadEachQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext,
+                                               VertxTestContext context) throws Exception
     {
         BBHelperHalveClusterMultiDCFailure.reset();
         int leavingNodesPerDC = 3;
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperHalveClusterMultiDCFailure::install, cassandraTestContext);
 
-        runLeavingTestScenario(leavingNodesPerDC,
+        runLeavingTestScenario(context,
+                               leavingNodesPerDC,
                                BBHelperHalveClusterMultiDCFailure.transientStateStart,
                                BBHelperHalveClusterMultiDCFailure.transientStateEnd,
                                cluster,
@@ -141,13 +153,15 @@ class LeavingMultiDCHalveClusterTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext,
+                               VertxTestContext context) throws Exception
     {
         BBHelperHalveClusterMultiDC.reset();
         int leavingNodesPerDC = 3;
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperHalveClusterMultiDC::install, cassandraTestContext);
 
-        runLeavingTestScenario(leavingNodesPerDC,
+        runLeavingTestScenario(context,
+                               leavingNodesPerDC,
                                BBHelperHalveClusterMultiDC.transientStateStart,
                                BBHelperHalveClusterMultiDC.transientStateEnd,
                                cluster,
@@ -157,13 +171,15 @@ class LeavingMultiDCHalveClusterTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext,
+                                      VertxTestContext context) throws Exception
     {
         BBHelperHalveClusterMultiDCFailure.reset();
         int leavingNodesPerDC = 3;
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperHalveClusterMultiDCFailure::install, cassandraTestContext);
 
-        runLeavingTestScenario(leavingNodesPerDC,
+        runLeavingTestScenario(context,
+                               leavingNodesPerDC,
                                BBHelperHalveClusterMultiDCFailure.transientStateStart,
                                BBHelperHalveClusterMultiDCFailure.transientStateEnd,
                                cluster,
@@ -173,13 +189,15 @@ class LeavingMultiDCHalveClusterTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext,
+                         VertxTestContext context) throws Exception
     {
         BBHelperHalveClusterMultiDC.reset();
         int leavingNodesPerDC = 3;
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperHalveClusterMultiDC::install, cassandraTestContext);
 
-        runLeavingTestScenario(leavingNodesPerDC,
+        runLeavingTestScenario(context,
+                               leavingNodesPerDC,
                                BBHelperHalveClusterMultiDC.transientStateStart,
                                BBHelperHalveClusterMultiDC.transientStateEnd,
                                cluster,
@@ -189,13 +207,15 @@ class LeavingMultiDCHalveClusterTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext,
+                                VertxTestContext context) throws Exception
     {
         BBHelperHalveClusterMultiDCFailure.reset();
         int leavingNodesPerDC = 3;
         UpgradeableCluster cluster = getMultiDCCluster(BBHelperHalveClusterMultiDCFailure::install, cassandraTestContext);
 
-        runLeavingTestScenario(leavingNodesPerDC,
+        runLeavingTestScenario(context,
+                               leavingNodesPerDC,
                                BBHelperHalveClusterMultiDCFailure.transientStateStart,
                                BBHelperHalveClusterMultiDCFailure.transientStateEnd,
                                cluster,

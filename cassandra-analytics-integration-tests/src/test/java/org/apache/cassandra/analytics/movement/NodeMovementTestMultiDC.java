@@ -25,7 +25,11 @@ import java.util.concurrent.Future;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
+import org.junit.jupiter.api.extension.ExtendWith;
+
 import com.datastax.driver.core.ConsistencyLevel;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -40,14 +44,17 @@ import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
 
 import static net.bytebuddy.matcher.ElementMatchers.named;
 
+@ExtendWith(VertxExtension.class)
 public class NodeMovementTestMultiDC extends NodeMovementBaseTest
 {
 
     @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void moveNodeMultiDCTest(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void moveNodeMultiDCTest(ConfigurableCassandraTestContext cassandraTestContext,
+                             VertxTestContext context) throws Exception
     {
         BBHelperMovingNodeMultiDC.reset();
-        runMovingNodeTest(cassandraTestContext,
+        runMovingNodeTest(context,
+                          cassandraTestContext,
                           BBHelperMovingNodeMultiDC::install,
                           BBHelperMovingNodeMultiDC.transientStateStart,
                           BBHelperMovingNodeMultiDC.transientStateEnd,
@@ -59,10 +66,12 @@ public class NodeMovementTestMultiDC extends NodeMovementBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void moveNodeMultiDCQuorumReadWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void moveNodeMultiDCQuorumReadWrite(ConfigurableCassandraTestContext cassandraTestContext,
+                                        VertxTestContext context) throws Exception
     {
         BBHelperMovingNodeMultiDC.reset();
-        runMovingNodeTest(cassandraTestContext,
+        runMovingNodeTest(context,
+                          cassandraTestContext,
                           BBHelperMovingNodeMultiDC::install,
                           BBHelperMovingNodeMultiDC.transientStateStart,
                           BBHelperMovingNodeMultiDC.transientStateEnd,
@@ -74,10 +83,12 @@ public class NodeMovementTestMultiDC extends NodeMovementBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void moveNodeMultiDCEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void moveNodeMultiDCEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext,
+                                        VertxTestContext context) throws Exception
     {
         BBHelperMovingNodeMultiDC.reset();
-        runMovingNodeTest(cassandraTestContext,
+        runMovingNodeTest(context,
+                          cassandraTestContext,
                           BBHelperMovingNodeMultiDC::install,
                           BBHelperMovingNodeMultiDC.transientStateStart,
                           BBHelperMovingNodeMultiDC.transientStateEnd,
@@ -89,10 +100,12 @@ public class NodeMovementTestMultiDC extends NodeMovementBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void moveNodeMultiDCAllWriteOneRead(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void moveNodeMultiDCAllWriteOneRead(ConfigurableCassandraTestContext cassandraTestContext,
+                                        VertxTestContext context) throws Exception
     {
         BBHelperMovingNodeMultiDC.reset();
-        runMovingNodeTest(cassandraTestContext,
+        runMovingNodeTest(context,
+                          cassandraTestContext,
                           BBHelperMovingNodeMultiDC::install,
                           BBHelperMovingNodeMultiDC.transientStateStart,
                           BBHelperMovingNodeMultiDC.transientStateEnd,
@@ -104,10 +117,12 @@ public class NodeMovementTestMultiDC extends NodeMovementBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void moveNodeMultiDCOneWriteAllRead(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void moveNodeMultiDCOneWriteAllRead(ConfigurableCassandraTestContext cassandraTestContext,
+                                        VertxTestContext context) throws Exception
     {
         BBHelperMovingNodeMultiDC.reset();
-        runMovingNodeTest(cassandraTestContext,
+        runMovingNodeTest(context,
+                          cassandraTestContext,
                           BBHelperMovingNodeMultiDC::install,
                           BBHelperMovingNodeMultiDC.transientStateStart,
                           BBHelperMovingNodeMultiDC.transientStateEnd,
@@ -119,10 +134,12 @@ public class NodeMovementTestMultiDC extends NodeMovementBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void moveNodeFailureMultiDCTest(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void moveNodeFailureMultiDCTest(ConfigurableCassandraTestContext cassandraTestContext,
+                                    VertxTestContext context) throws Exception
     {
         BBHelperMultiDCMovingNodeFailure.reset();
-        runMovingNodeTest(cassandraTestContext,
+        runMovingNodeTest(context,
+                          cassandraTestContext,
                           BBHelperMultiDCMovingNodeFailure::install,
                           BBHelperMultiDCMovingNodeFailure.transientStateStart,
                           BBHelperMultiDCMovingNodeFailure.transientStateEnd,
@@ -134,10 +151,12 @@ public class NodeMovementTestMultiDC extends NodeMovementBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void moveNodeFailureMultiDCEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void moveNodeFailureMultiDCEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext,
+                                               VertxTestContext context) throws Exception
     {
         BBHelperMultiDCMovingNodeFailure.reset();
-        runMovingNodeTest(cassandraTestContext,
+        runMovingNodeTest(context,
+                          cassandraTestContext,
                           BBHelperMultiDCMovingNodeFailure::install,
                           BBHelperMultiDCMovingNodeFailure.transientStateStart,
                           BBHelperMultiDCMovingNodeFailure.transientStateEnd,
@@ -149,10 +168,12 @@ public class NodeMovementTestMultiDC extends NodeMovementBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void moveNodeFailureMultiDCAllWriteOneRead(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void moveNodeFailureMultiDCAllWriteOneRead(ConfigurableCassandraTestContext cassandraTestContext,
+                                               VertxTestContext context) throws Exception
     {
         BBHelperMultiDCMovingNodeFailure.reset();
-        runMovingNodeTest(cassandraTestContext,
+        runMovingNodeTest(context,
+                          cassandraTestContext,
                           BBHelperMultiDCMovingNodeFailure::install,
                           BBHelperMultiDCMovingNodeFailure.transientStateStart,
                           BBHelperMultiDCMovingNodeFailure.transientStateEnd,

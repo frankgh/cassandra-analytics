@@ -18,7 +18,7 @@
 
 package org.apache.cassandra.analytics.movement;
 
-import java.io.IOException;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -28,6 +28,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Session;
+import io.vertx.junit5.VertxTestContext;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.analytics.TestTokenSupplier;
@@ -45,14 +46,16 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
     public static final int SINGLE_DC_MOVING_NODE_IDX = 5;
     public static final int MULTI_DC_MOVING_NODE_IDX = 3;
 
-    void runMovingNodeTest(ConfigurableCassandraTestContext cassandraTestContext,
+    // CHECKSTYLE IGNORE: Constructor with many parameters
+    void runMovingNodeTest(VertxTestContext context,
+                           ConfigurableCassandraTestContext cassandraTestContext,
                            BiConsumer<ClassLoader, Integer> instanceInitializer,
                            CountDownLatch transientStateStart,
                            CountDownLatch transientStateEnd,
                            boolean isCrossDCKeyspace,
                            boolean isFailure,
                            ConsistencyLevel readCL,
-                           ConsistencyLevel writeCL) throws IOException
+                           ConsistencyLevel writeCL) throws Exception
 
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
@@ -105,6 +108,7 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
         }
         Session session = maybeGetSession();
         validateData(session, schema.tableName(), readCL);
+        validateTransientNodeData(context, schema, Collections.singletonList(movingNode), true);
 
         if (isFailure)
         {

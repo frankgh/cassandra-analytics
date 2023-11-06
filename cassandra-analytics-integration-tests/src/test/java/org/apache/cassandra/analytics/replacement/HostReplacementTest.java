@@ -24,7 +24,11 @@ import java.util.concurrent.CountDownLatch;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
+import org.junit.jupiter.api.extension.ExtendWith;
+
 import com.datastax.driver.core.ConsistencyLevel;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -40,14 +44,17 @@ import org.apache.cassandra.utils.Shared;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
+@ExtendWith(VertxExtension.class)
 public class HostReplacementTest extends HostReplacementBaseTest
 {
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void hostReplacementQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void hostReplacementQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext,
+                                           VertxTestContext context) throws Exception
     {
         BBHelperReplacementsNode.reset();
-        runReplacementTest(cassandraTestContext,
+        runReplacementTest(context,
+                           cassandraTestContext,
                            BBHelperReplacementsNode::install,
                            BBHelperReplacementsNode.transientStateStart,
                            BBHelperReplacementsNode.transientStateEnd,
@@ -60,10 +67,12 @@ public class HostReplacementTest extends HostReplacementBaseTest
 
     // Note: The following test depends on sidecar fix: https://issues.apache.org/jira/browse/CASSANDRASC-78
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void hostReplacementOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void hostReplacementOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext,
+                                        VertxTestContext context) throws Exception
     {
         BBHelperReplacementsNode.reset();
-        runReplacementTest(cassandraTestContext,
+        runReplacementTest(context,
+                           cassandraTestContext,
                            BBHelperReplacementsNode::install,
                            BBHelperReplacementsNode.transientStateStart,
                            BBHelperReplacementsNode.transientStateEnd,
@@ -75,10 +84,12 @@ public class HostReplacementTest extends HostReplacementBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void hostReplacementFailureQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void hostReplacementFailureQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext,
+                                                  VertxTestContext context) throws Exception
     {
         BBHelperReplacementsNodeFailure.reset();
-        runReplacementTest(cassandraTestContext,
+        runReplacementTest(context,
+                           cassandraTestContext,
                            BBHelperReplacementsNodeFailure::install,
                            BBHelperReplacementsNodeFailure.transientStateStart,
                            BBHelperReplacementsNodeFailure.transientStateEnd,
@@ -91,10 +102,12 @@ public class HostReplacementTest extends HostReplacementBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void hostReplacementFailureOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void hostReplacementFailureOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext,
+                                               VertxTestContext context) throws Exception
     {
         BBHelperReplacementsNodeFailure.reset();
-        runReplacementTest(cassandraTestContext,
+        runReplacementTest(context,
+                           cassandraTestContext,
                            BBHelperReplacementsNodeFailure::install,
                            BBHelperReplacementsNodeFailure.transientStateStart,
                            BBHelperReplacementsNodeFailure.transientStateEnd,

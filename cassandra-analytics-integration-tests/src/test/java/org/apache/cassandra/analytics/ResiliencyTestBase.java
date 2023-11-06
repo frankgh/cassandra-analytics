@@ -191,8 +191,15 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
     }
 
     public void validateTransientNodeData(VertxTestContext context,
+                                          QualifiedTableName table,
+                                          List<IUpgradeableInstance> transientNodes) throws Exception
+    {
+        validateTransientNodeData(context, table, transientNodes, false);
+    }
+    public void validateTransientNodeData(VertxTestContext context,
                                            QualifiedTableName table,
-                                           List<IUpgradeableInstance> transientNodes) throws Exception
+                                           List<IUpgradeableInstance> transientNodes,
+                                          boolean isMoving) throws Exception
     {
         List<Tuple2<DecoratedKey, Object[]>> tupleData = generateData(rowCount);
         retrieveMappingWithKeyspace(context, TEST_KEYSPACE, response -> {
@@ -201,7 +208,7 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
 
             for (IUpgradeableInstance instance : transientNodes)
             {
-                validateRowsOnInstance(instance, table.tableName(), mappingResponse, tupleData);
+                validateRowsOnInstance(instance, table.tableName(), mappingResponse, tupleData, isMoving);
             }
 
             context.completeNow();
@@ -211,7 +218,8 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
     public void validateRowsOnInstance(IUpgradeableInstance instance,
                                        String tableName,
                                        TokenRangeReplicasResponse tokenRangesResponse,
-                                       List<Tuple2<DecoratedKey, Object[]>> tupleData)
+                                       List<Tuple2<DecoratedKey, Object[]>> tupleData,
+                                       boolean isMoving)
     {
         Set<String> expectedRows = filterRowsForInstance(tokenRangesResponse,
                                                          instance,
@@ -228,7 +236,14 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
             rows.add(id + ":" + course + ":" + marks);
         }
 
-        assertThat(rows).containsExactlyInAnyOrderElementsOf(expectedRows);
+        if (isMoving)
+        {
+            assertThat(rows).containsAll(expectedRows);
+        }
+        else
+        {
+            assertThat(rows).containsExactlyInAnyOrderElementsOf(expectedRows);
+        }
     }
 
     private Set<String> filterRowsForInstance(TokenRangeReplicasResponse mappingResponse,

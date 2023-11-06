@@ -24,7 +24,11 @@ import java.util.concurrent.CountDownLatch;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
+import org.junit.jupiter.api.extension.ExtendWith;
+
 import com.datastax.driver.core.ConsistencyLevel;
+import io.vertx.junit5.VertxExtension;
+import io.vertx.junit5.VertxTestContext;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -40,15 +44,18 @@ import org.apache.cassandra.utils.Shared;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
+@ExtendWith(VertxExtension.class)
 public class HostReplacementMultiDCTest extends HostReplacementBaseTest
 {
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementMultiDCTest(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void nodeReplacementMultiDCTest(ConfigurableCassandraTestContext cassandraTestContext,
+                                    VertxTestContext context) throws Exception
     {
         BBHelperNodeReplacementMultiDC.reset();
 
-        runReplacementTest(cassandraTestContext,
+        runReplacementTest(context,
+                           cassandraTestContext,
                            BBHelperNodeReplacementMultiDC::install,
                            BBHelperNodeReplacementMultiDC.transientStateStart,
                            BBHelperNodeReplacementMultiDC.transientStateEnd,
@@ -61,11 +68,13 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementMultiDCEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void nodeReplacementMultiDCEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext,
+                                               VertxTestContext context) throws Exception
     {
         BBHelperNodeReplacementMultiDC.reset();
 
-        runReplacementTest(cassandraTestContext,
+        runReplacementTest(context,
+                           cassandraTestContext,
                            BBHelperNodeReplacementMultiDC::install,
                            BBHelperNodeReplacementMultiDC.transientStateStart,
                            BBHelperNodeReplacementMultiDC.transientStateEnd,
@@ -78,11 +87,13 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementMultiDCQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void nodeReplacementMultiDCQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext,
+                                           VertxTestContext context) throws Exception
     {
         BBHelperNodeReplacementMultiDC.reset();
 
-        runReplacementTest(cassandraTestContext,
+        runReplacementTest(context,
+                           cassandraTestContext,
                            BBHelperNodeReplacementMultiDC::install,
                            BBHelperNodeReplacementMultiDC.transientStateStart,
                            BBHelperNodeReplacementMultiDC.transientStateEnd,
@@ -95,11 +106,13 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementMultiDCAllWriteOneRead(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void nodeReplacementMultiDCAllWriteOneRead(ConfigurableCassandraTestContext cassandraTestContext,
+                                               VertxTestContext context) throws Exception
     {
         BBHelperNodeReplacementMultiDC.reset();
 
-        runReplacementTest(cassandraTestContext,
+        runReplacementTest(context,
+                           cassandraTestContext,
                            BBHelperNodeReplacementMultiDC::install,
                            BBHelperNodeReplacementMultiDC.transientStateStart,
                            BBHelperNodeReplacementMultiDC.transientStateEnd,
@@ -116,11 +129,13 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
      * node intended to be replaced is 'Down' and the replacement node is not 'Normal'.
      */
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementFailureMultiDC(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void nodeReplacementFailureMultiDC(ConfigurableCassandraTestContext cassandraTestContext,
+                                       VertxTestContext context) throws Exception
     {
         BBHelperReplacementFailureMultiDC.reset();
 
-        runReplacementTest(cassandraTestContext,
+        runReplacementTest(context,
+                           cassandraTestContext,
                            BBHelperReplacementFailureMultiDC::install,
                            BBHelperReplacementFailureMultiDC.transientStateStart,
                            BBHelperReplacementFailureMultiDC.transientStateEnd,
@@ -139,11 +154,13 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
      */
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementFailureMultiDCInsufficientNodes(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void nodeReplacementFailureMultiDCInsufficientNodes(ConfigurableCassandraTestContext cassandraTestContext,
+                                                        VertxTestContext context) throws Exception
     {
         BBHelperNodeReplacementMultiDCInsufficientReplicas.reset();
 
-        runReplacementTest(cassandraTestContext,
+        runReplacementTest(context,
+                           cassandraTestContext,
                            BBHelperNodeReplacementMultiDCInsufficientReplicas::install,
                            BBHelperNodeReplacementMultiDCInsufficientReplicas.transientStateStart,
                            BBHelperNodeReplacementMultiDCInsufficientReplicas.transientStateEnd,

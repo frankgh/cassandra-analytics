@@ -18,7 +18,6 @@
 
 package org.apache.cassandra.analytics.replacement;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -32,6 +31,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Session;
+import io.vertx.junit5.VertxTestContext;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.analytics.TestTokenSupplier;
@@ -52,7 +52,8 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
 {
 
     // CHECKSTYLE IGNORE: Method with many parameters
-    void runReplacementTest(ConfigurableCassandraTestContext cassandraTestContext,
+    void runReplacementTest(VertxTestContext context,
+                            ConfigurableCassandraTestContext cassandraTestContext,
                             BiConsumer<ClassLoader, Integer> instanceInitializer,
                             CountDownLatch transientStateStart,
                             CountDownLatch transientStateEnd,
@@ -60,9 +61,10 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                             boolean isCrossDCKeyspace,
                             boolean isFailure,
                             ConsistencyLevel readCL,
-                            ConsistencyLevel writeCL) throws IOException
+                            ConsistencyLevel writeCL) throws Exception
     {
-        runReplacementTest(cassandraTestContext,
+        runReplacementTest(context,
+                           cassandraTestContext,
                            instanceInitializer,
                            transientStateStart,
                            transientStateEnd,
@@ -76,7 +78,8 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
     }
 
     // CHECKSTYLE IGNORE: Method with many parameters
-    void runReplacementTest(ConfigurableCassandraTestContext cassandraTestContext,
+    void runReplacementTest(VertxTestContext context,
+                            ConfigurableCassandraTestContext cassandraTestContext,
                             BiConsumer<ClassLoader, Integer> instanceInitializer,
                             CountDownLatch transientStateStart,
                             CountDownLatch transientStateEnd,
@@ -86,7 +89,7 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                             boolean isFailure,
                             boolean shouldWriteFail,
                             ConsistencyLevel readCL,
-                            ConsistencyLevel writeCL) throws IOException
+                            ConsistencyLevel writeCL) throws Exception
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         TokenSupplier tokenSupplier = TestTokenSupplier.evenlyDistributedTokens(annotation.nodesPerDc(),
@@ -165,13 +168,14 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
 
         if (!shouldWriteFail)
         {
-            if (!isFailure)
-            {
-                ClusterUtils.awaitRingState(cluster.get(1), newNodes.get(0), "Normal");
-            }
+//            if (!isFailure)
+//            {
+//                ClusterUtils.awaitRingState(cluster.get(1), newNodes.get(0), "Normal");
+//            }
 
             Session session = maybeGetSession();
             validateData(session, schema.tableName(), readCL);
+            validateTransientNodeData(context, schema, newNodes);
 
             if (isFailure)
             {

@@ -57,86 +57,69 @@ public class JoiningBaseTest extends ResiliencyTestBase
                                 boolean isFailure) throws Exception
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
-        QualifiedTableName table = null;
-        List<IUpgradeableInstance> newInstances = new ArrayList<>();
+        QualifiedTableName table;
+        List<IUpgradeableInstance> newInstances;
         try
         {
             IUpgradeableInstance seed = cluster.get(1);
-
-            // Go over new nodes and add them once for each DC
-            for (int i = 0; i < annotation.newNodesPerDc(); i++)
-            {
-                int dcNodeIdx = 1; // Use node 2's DC
-                for (int dc = 1; dc <= annotation.numDcs(); dc++)
-                {
-                    IUpgradeableInstance dcNode = cluster.get(dcNodeIdx++);
-                    IUpgradeableInstance newInstance = ClusterUtils.addInstance(cluster,
-                                                                                dcNode.config().localDatacenter(),
-                                                                                dcNode.config().localRack(),
-                                                                                inst -> {
-                                                                                    inst.set("auto_bootstrap", true);
-                                                                                    inst.with(Feature.GOSSIP,
-                                                                                              Feature.JMX,
-                                                                                              Feature.NATIVE_PROTOCOL);
-                                                                                });
-                    new Thread(() -> newInstance.startup(cluster)).start();
-                    newInstances.add(newInstance);
-                }
-            }
+            newInstances = addNewInstances(cluster, annotation.newNodesPerDc(), annotation.numDcs());
 
             Uninterruptibles.awaitUninterruptibly(transientStateStart, 2, TimeUnit.MINUTES);
 
-            for (IUpgradeableInstance newInstance : newInstances)
-            {
-                ClusterUtils.awaitRingState(seed, newInstance, "Joining");
-            }
-
-            if (!isFailure)
-            {
-                table = bulkWriteData(isCrossDCKeyspace, writeCL);
-                Session session = maybeGetSession();
-                assertNotNull(table);
-                validateData(session, table.tableName(), readCL);
-                validateTransientNodeData(context, table, newInstances);
-            }
-        }
-        catch (Exception e)
-        {
-            throw new RuntimeException(e);
+            newInstances.forEach(instance -> ClusterUtils.awaitRingState(seed, instance, "Joining"));
+            table = bulkWriteData(isCrossDCKeyspace, writeCL);
         }
         finally
         {
-            if (!isFailure)
-            {
-                for (int i = 0; i < (annotation.newNodesPerDc() * annotation.numDcs()); i++)
-                {
-                    transientStateEnd.countDown();
-                }
-            }
-        }
-
-        // We fail after triggering bulk writer job. We want to make sure that read validation clears if the
-        // if failure happens in transient node
-        if (isFailure)
-        {
-            table = bulkWriteData(isCrossDCKeyspace, writeCL);
             for (int i = 0; i < (annotation.newNodesPerDc() * annotation.numDcs()); i++)
             {
                 transientStateEnd.countDown();
             }
-            assertNotNull(table);
-            Session session = maybeGetSession();
-            validateData(session, table.tableName(), readCL);
-            validateTransientNodeData(context, table, newInstances);
+        }
 
+        assertNotNull(table);
+        Session session = maybeGetSession();
+        validateData(session, table.tableName(), readCL);
+        validateTransientNodeData(context, table, newInstances);
+
+        // For tests that involve JOIN failures, we make a best-effort attempt to check if the node join has failed
+        // by checking if the node has either left the ring or is still in JOINING state, but not NORMAL
+        if (isFailure)
+        {
             for (IUpgradeableInstance joiningNode : newInstances)
             {
-                Optional<ClusterUtils.RingInstanceDetails> joiningNodeDetails = getMatchingInstanceFromRing(cluster.get(1), joiningNode.broadcastAddress()
-                                                                                                                                       .getAddress()
-                                                                                                                                       .getHostAddress());
-                joiningNodeDetails.ifPresent(ringInstanceDetails -> assertThat(ringInstanceDetails.getState()).isNotEqualTo("Normal"));
+                Optional<ClusterUtils.RingInstanceDetails> joiningNodeDetails =
+                getMatchingInstanceFromRing(cluster.get(1), joiningNode);
+                joiningNodeDetails.ifPresent(ringInstanceDetails -> assertThat(ringInstanceDetails.getState())
+                                                                    .isNotEqualTo("Normal"));
             }
         }
+    }
+
+    private List<IUpgradeableInstance> addNewInstances(UpgradeableCluster cluster, int newNodesPerDc, int numDcs)
+    {
+        List<IUpgradeableInstance> newInstances = new ArrayList<>();
+        // Go over new nodes and add them once for each DC
+        for (int i = 0; i < newNodesPerDc; i++)
+        {
+            int dcNodeIdx = 1; // Use node 2's DC
+            for (int dc = 1; dc <= numDcs; dc++)
+            {
+                IUpgradeableInstance dcNode = cluster.get(dcNodeIdx++);
+                IUpgradeableInstance newInstance = ClusterUtils.addInstance(cluster,
+                                                                            dcNode.config().localDatacenter(),
+                                                                            dcNode.config().localRack(),
+                                                                            inst -> {
+                                                                                inst.set("auto_bootstrap", true);
+                                                                                inst.with(Feature.GOSSIP,
+                                                                                          Feature.JMX,
+                                                                                          Feature.NATIVE_PROTOCOL);
+                                                                            });
+                new Thread(() -> newInstance.startup(cluster)).start();
+                newInstances.add(newInstance);
+            }
+        }
+        return newInstances;
     }
 
     void runJoiningTestScenario(VertxTestContext context,
@@ -172,8 +155,9 @@ public class JoiningBaseTest extends ResiliencyTestBase
     }
 
     private Optional<ClusterUtils.RingInstanceDetails> getMatchingInstanceFromRing(IUpgradeableInstance seed,
-                                                                                   String ipAddress)
+                                                                                   IUpgradeableInstance instance)
     {
+        String ipAddress = instance.broadcastAddress().getAddress().getHostAddress();
         return ClusterUtils.ring(seed)
                            .stream()
                            .filter(i -> i.getAddress().equals(ipAddress))

@@ -102,6 +102,7 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
             transientStateEnd.countDown();
         }
 
+        // It is only in successful MOVE operation that we validate that the node has reached NORMAL state
         if (!isFailure)
         {
             ClusterUtils.awaitRingState(cluster.get(1), movingNode, "Normal");
@@ -110,6 +111,8 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
         validateData(session, schema.tableName(), readCL);
         validateTransientNodeData(context, schema, Collections.singletonList(movingNode), true);
 
+        // For tests that involve MOVE failures, we make a best-effort attempt by checking if the node is either
+        // still MOVING or has flipped back to NORMAL state with the initial token that it previously held
         if (isFailure)
         {
             Optional<ClusterUtils.RingInstanceDetails> movingInstance =

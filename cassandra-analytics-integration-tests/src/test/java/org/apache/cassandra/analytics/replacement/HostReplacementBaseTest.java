@@ -147,16 +147,18 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                 assertThat(replacementInstance).isPresent();
                 // Verify that replacement node tokens match the removed nodes
                 assertThat(removedNodeTokens).contains(replacementInstance.get().getToken());
-
-                if (shouldWriteFail)
-                {
-                    assertThrows(RuntimeException.class, () -> bulkWriteData(isCrossDCKeyspace, writeCL));
-                }
-                else
-                {
-                    schema = bulkWriteData(isCrossDCKeyspace, writeCL);
-                }
             }
+
+            // It is only in the event we have insufficient nodes, we expect write job to fail
+            if (shouldWriteFail)
+            {
+                assertThrows(RuntimeException.class, () -> bulkWriteData(isCrossDCKeyspace, writeCL));
+            }
+            else
+            {
+                schema = bulkWriteData(isCrossDCKeyspace, writeCL);
+            }
+
         }
         finally
         {
@@ -168,6 +170,7 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
 
         if (!shouldWriteFail)
         {
+            // It is only in successful REPLACE operation that we validate that the node has reached NORMAL state
             if (!isFailure)
             {
                 ClusterUtils.awaitRingState(cluster.get(1), newNodes.get(0), "Normal");
@@ -177,6 +180,9 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
             validateData(session, schema.tableName(), readCL);
             validateTransientNodeData(context, schema, newNodes);
 
+            // For replacement failure cases, we make a best-effort attempt to validate that
+            // 1) replacement node is not NORMAL, and 2) removed node is DOWN
+            // This is to work around the non-deterministic nature of gossip settling
             if (isFailure)
             {
                 Optional<ClusterUtils.RingInstanceDetails> replacementNode =

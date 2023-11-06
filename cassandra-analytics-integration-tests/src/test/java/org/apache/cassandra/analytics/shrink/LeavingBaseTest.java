@@ -52,63 +52,54 @@ class LeavingBaseTest extends ResiliencyTestBase
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         QualifiedTableName table;
-        List<IUpgradeableInstance> leavingNodes = new ArrayList<>();
+        List<IUpgradeableInstance> leavingNodes;
         try
         {
             IUpgradeableInstance seed = cluster.get(1);
-
-            for (int i = 0; i < leavingNodesPerDC * annotation.numDcs(); i++)
-            {
-                IUpgradeableInstance node = cluster.get(cluster.size() - i);
-                new Thread(() -> node.nodetoolResult("decommission").asserts().success()).start();
-                leavingNodes.add(node);
-            }
+            leavingNodes = stopNodes(cluster, leavingNodesPerDC, annotation.numDcs());
 
             // Wait until nodes have reached expected state
             Uninterruptibles.awaitUninterruptibly(transientStateStart);
 
-            for (IUpgradeableInstance node : leavingNodes)
-            {
-                ClusterUtils.awaitRingState(seed, node, "Leaving");
-            }
-
-            if (!isFailure)
-            {
-                table = bulkWriteData(annotation.numDcs() > 1, writeCL);
-                Session session = maybeGetSession();
-                assertNotNull(table);
-                validateData(session, table.tableName(), readCL);
-                validateTransientNodeData(context, table, leavingNodes);
-            }
+            leavingNodes.forEach(instance -> ClusterUtils.awaitRingState(seed, instance, "Leaving"));
+            table = bulkWriteData(annotation.numDcs() > 1, writeCL);
         }
         finally
         {
-            if (!isFailure)
-            {
-                for (int i = 0; i < leavingNodesPerDC; i++)
-                {
-                    transientStateEnd.countDown();
-                }
-            }
-        }
-
-        // We fail after triggering bulk writer job. We want to make sure that read validation clears if the
-        // if failure happens in transient node
-        if (isFailure)
-        {
-            table = bulkWriteData(annotation.numDcs() > 1, writeCL);
             for (int i = 0; i < leavingNodesPerDC; i++)
             {
                 transientStateEnd.countDown();
             }
-            Session session = maybeGetSession();
-            assertNotNull(table);
-            validateData(session, table.tableName(), readCL);
+        }
 
+        Session session = maybeGetSession();
+        assertNotNull(table);
+        validateData(session, table.tableName(), readCL);
+
+        // For tests that involve LEAVE failures, we validate that the leaving nodes are part of the cluster
+        if (isFailure)
+        {
             // check leave node are part of cluster when leave fails
             assertTrue(areLeavingNodesPartOfCluster(cluster.get(1), leavingNodes));
             context.completeNow();
         }
+        else
+        {
+            validateTransientNodeData(context, table, leavingNodes);
+        }
+    }
+
+    private List<IUpgradeableInstance> stopNodes(UpgradeableCluster cluster, int leavingNodesPerDC, int numDcs)
+    {
+        List<IUpgradeableInstance> leavingNodes = new ArrayList<>();
+        for (int i = 0; i < leavingNodesPerDC * numDcs; i++)
+        {
+            IUpgradeableInstance node = cluster.get(cluster.size() - i);
+            new Thread(() -> node.nodetoolResult("decommission").asserts().success()).start();
+            leavingNodes.add(node);
+        }
+
+        return leavingNodes;
     }
 
     private boolean areLeavingNodesPartOfCluster(IUpgradeableInstance seed, List<IUpgradeableInstance> leavingNodes)

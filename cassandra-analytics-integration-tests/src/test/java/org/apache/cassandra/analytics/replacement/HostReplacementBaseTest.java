@@ -168,10 +168,10 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
 
         if (!shouldWriteFail)
         {
-//            if (!isFailure)
-//            {
-//                ClusterUtils.awaitRingState(cluster.get(1), newNodes.get(0), "Normal");
-//            }
+            if (!isFailure)
+            {
+                ClusterUtils.awaitRingState(cluster.get(1), newNodes.get(0), "Normal");
+            }
 
             Session session = maybeGetSession();
             validateData(session, schema.tableName(), readCL);

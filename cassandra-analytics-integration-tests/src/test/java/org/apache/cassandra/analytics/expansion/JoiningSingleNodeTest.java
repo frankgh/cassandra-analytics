@@ -24,11 +24,7 @@ import java.util.concurrent.CountDownLatch;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
-import org.junit.jupiter.api.extension.ExtendWith;
-
 import com.datastax.driver.core.ConsistencyLevel;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -44,60 +40,55 @@ import org.apache.cassandra.utils.Shared;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
-@ExtendWith(VertxExtension.class)
 public class JoiningSingleNodeTest extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void oneReadALLWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
+    void oneReadALLWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleJoiningNode.reset();
-        runJoiningTestScenario(context,
-                               cassandraTestContext,
+        runJoiningTestScenario(cassandraTestContext,
                                BBHelperSingleJoiningNode::install,
-                               BBHelperSingleJoiningNode.transientStateStart,
-                               BBHelperSingleJoiningNode.transientStateEnd,
+                               BBHelperSingleJoiningNode.transitioningStateStart,
+                               BBHelperSingleJoiningNode.transitioningStateEnd,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
                                false);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void oneReadALLWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
+    void oneReadALLWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleJoiningNodeFailure.reset();
-        runJoiningTestScenario(context,
-                               cassandraTestContext,
+        runJoiningTestScenario(cassandraTestContext,
                                BBHelperSingleJoiningNodeFailure::install,
-                               BBHelperSingleJoiningNodeFailure.transientStateStart,
-                               BBHelperSingleJoiningNodeFailure.transientStateEnd,
+                               BBHelperSingleJoiningNodeFailure.transitioningStateStart,
+                               BBHelperSingleJoiningNodeFailure.transitioningStateEnd,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
                                true);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
+    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleJoiningNode.reset();
-        runJoiningTestScenario(context,
-                               cassandraTestContext,
+        runJoiningTestScenario(cassandraTestContext,
                                BBHelperSingleJoiningNode::install,
-                               BBHelperSingleJoiningNode.transientStateStart,
-                               BBHelperSingleJoiningNode.transientStateEnd,
+                               BBHelperSingleJoiningNode.transitioningStateStart,
+                               BBHelperSingleJoiningNode.transitioningStateEnd,
                                ConsistencyLevel.QUORUM,
                                ConsistencyLevel.QUORUM,
                                false);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
+    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleJoiningNodeFailure.reset();
-        runJoiningTestScenario(context,
-                               cassandraTestContext,
+        runJoiningTestScenario(cassandraTestContext,
                                BBHelperSingleJoiningNodeFailure::install,
-                               BBHelperSingleJoiningNodeFailure.transientStateStart,
-                               BBHelperSingleJoiningNodeFailure.transientStateEnd,
+                               BBHelperSingleJoiningNodeFailure.transitioningStateStart,
+                               BBHelperSingleJoiningNodeFailure.transitioningStateEnd,
                                ConsistencyLevel.QUORUM,
                                ConsistencyLevel.QUORUM,
                                true);
@@ -109,8 +100,8 @@ public class JoiningSingleNodeTest extends JoiningBaseTest
     @Shared
     public static class BBHelperSingleJoiningNode
     {
-        static CountDownLatch transientStateStart = new CountDownLatch(1);
-        static CountDownLatch transientStateEnd = new CountDownLatch(1);
+        static CountDownLatch transitioningStateStart = new CountDownLatch(1);
+        static CountDownLatch transitioningStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -136,15 +127,15 @@ public class JoiningSingleNodeTest extends JoiningBaseTest
         {
             boolean result = orig.call();
             // trigger bootstrap start and wait until bootstrap is ready from test
-            transientStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            transitioningStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd);
             return result;
         }
 
         public static void reset()
         {
-            transientStateStart = new CountDownLatch(1);
-            transientStateEnd = new CountDownLatch(1);
+            transitioningStateStart = new CountDownLatch(1);
+            transitioningStateEnd = new CountDownLatch(1);
         }
     }
 
@@ -154,8 +145,8 @@ public class JoiningSingleNodeTest extends JoiningBaseTest
     @Shared
     public static class BBHelperSingleJoiningNodeFailure
     {
-        static CountDownLatch transientStateStart = new CountDownLatch(1);
-        static CountDownLatch transientStateEnd = new CountDownLatch(1);
+        static CountDownLatch transitioningStateStart = new CountDownLatch(1);
+        static CountDownLatch transitioningStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -181,15 +172,15 @@ public class JoiningSingleNodeTest extends JoiningBaseTest
         {
             boolean result = orig.call();
             // trigger bootstrap start and wait until bootstrap is ready from test
-            transientStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            transitioningStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd);
             throw new UnsupportedOperationException("Simulated failure");
         }
 
         public static void reset()
         {
-            transientStateStart = new CountDownLatch(1);
-            transientStateEnd = new CountDownLatch(1);
+            transitioningStateStart = new CountDownLatch(1);
+            transitioningStateEnd = new CountDownLatch(1);
         }
     }
 }

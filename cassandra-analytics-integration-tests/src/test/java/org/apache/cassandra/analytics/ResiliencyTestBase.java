@@ -29,14 +29,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Range;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.ConsistencyLevel;
@@ -44,14 +42,11 @@ import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.vertx.core.Handler;
-import io.vertx.core.buffer.Buffer;
-import io.vertx.ext.web.client.HttpResponse;
-import io.vertx.junit5.VertxTestContext;
+import o.a.c.analytics.sidecar.shaded.testing.adapters.base.StorageJmxOperations;
+import o.a.c.analytics.sidecar.shaded.testing.common.JmxClient;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
-import o.a.c.analytics.sidecar.shaded.testing.common.data.TokenRangeReplicasResponse;
 import org.apache.cassandra.distributed.UpgradeableCluster;
+import org.apache.cassandra.distributed.api.IInstanceConfig;
 import org.apache.cassandra.distributed.api.IUpgradeableInstance;
 import org.apache.cassandra.distributed.api.SimpleQueryResult;
 import org.apache.cassandra.distributed.api.TokenSupplier;
@@ -85,9 +80,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public abstract class ResiliencyTestBase extends IntegrationTestBase
 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(ResiliencyTestBase.class);
     private static final String createTableStmt = "create table if not exists %s (id int, course text, marks int, primary key (id));";
-    private static final String retrieveRows = "select * from " + TEST_KEYSPACE + ".%s";
+    protected static final String retrieveRows = "select * from " + TEST_KEYSPACE + ".%s";
     public static final int rowCount = 1000;
 
     public QualifiedTableName initializeSchema()
@@ -119,15 +113,16 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
                            .getOrCreate();
     }
 
-    public Set<String> getDataForRange(List<Tuple2<DecoratedKey, Object[]>> data, Range<BigInteger> range)
+    public Set<String> getDataForRange(Range<BigInteger> range)
     {
-        return data.stream()
+        // Iterate through all data entries; filter only entries that belong to range; convert to strings
+        return generateExpectedData().stream()
                    .filter(t -> range.contains(t._1().getToken()))
                    .map(t -> t._2()[0] + ":" + t._2()[1] + ":" + t._2()[2])
                    .collect(Collectors.toSet());
     }
 
-    public List<Tuple2<DecoratedKey, Object[]>> generateData(int rowCount)
+    public List<Tuple2<DecoratedKey, Object[]>> generateExpectedData()
     {
         // "create table if not exists %s (id int, course text, marks int, primary key (id));";
         List<ColumnType<?>> columnTypes = Arrays.asList(ColumnTypes.INT);
@@ -143,6 +138,79 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
                                };
             return Tuple2.apply(tokenizer.getDecoratedKey(columns), columns);
         }).collect(Collectors.toList());
+    }
+
+    public Map<IUpgradeableInstance, Set<String>> getInstanceData(List<IUpgradeableInstance> instances,
+                                                                  boolean isPending)
+    {
+
+        return instances.stream().collect(Collectors.toMap(Function.identity(),
+                                                           i -> filterTokenRangeData(getRangesForInstance(i, isPending))));
+    }
+
+    public Set<String> filterTokenRangeData(List<Range<BigInteger>> ranges)
+    {
+        return ranges.stream()
+                 .map(r -> getDataForRange(r))
+                 .flatMap(Collection::stream)
+                 .collect(Collectors.toSet());
+    }
+
+    private List<Range<BigInteger>> getRangesForInstance(IUpgradeableInstance instance, boolean isPending)
+    {
+        IInstanceConfig config = instance.config();
+        JmxClient client = JmxClient.builder()
+                                    .host(config.broadcastAddress().getAddress().getHostAddress())
+                                    .port(config.jmxPort())
+                                    .build();
+        StorageJmxOperations ss = client.proxy(StorageJmxOperations.class, "org.apache.cassandra.db:type=StorageService");
+
+        Map<List<String>, List<String>> ranges = isPending ? ss.getPendingRangeToEndpointWithPortMap(TEST_KEYSPACE)
+                                                           : ss.getRangeToEndpointWithPortMap(TEST_KEYSPACE);
+
+        // filter ranges that belong to the instance
+        return ranges.entrySet()
+                            .stream()
+                            .filter(e -> e.getValue().contains(instance.broadcastAddress().getAddress().getHostAddress()
+                                                               + ":" + instance.broadcastAddress().getPort()))
+                            .map(e -> unwrapRanges(e.getKey()))
+                            .flatMap(Collection::stream)
+                            .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns the expected set of rows as strings for each instance in the cluster
+     */
+    public Map<IUpgradeableInstance, Set<String>> generateExpectedInstanceData(UpgradeableCluster cluster,
+                                                                                List<IUpgradeableInstance> pendingNodes)
+    {
+        List<IUpgradeableInstance> instances = cluster.stream().collect(Collectors.toList());
+        Map<IUpgradeableInstance, Set<String>> expectedInstanceData = getInstanceData(instances, false);
+        // Use pending ranges to get data for each transitioning instance
+        Map<IUpgradeableInstance, Set<String>> transitioningInstanceData = getInstanceData(pendingNodes, true);
+        expectedInstanceData.putAll(transitioningInstanceData.entrySet()
+                                                             .stream()
+                                                             .filter(e -> !e.getValue().isEmpty())
+                                                             .collect(Collectors.toMap(Map.Entry::getKey,
+                                                                                       Map.Entry::getValue)));
+        return  expectedInstanceData;
+    }
+
+    private List<Range<BigInteger>> unwrapRanges(List<String> range)
+    {
+        List<Range<BigInteger>> ranges = new ArrayList<Range<BigInteger>>();
+        BigInteger start = new BigInteger(range.get(0));
+        BigInteger end = new BigInteger(range.get(1));
+        if (start.compareTo(end) > 0)
+        {
+            ranges.add(Range.openClosed(start, BigInteger.valueOf(Long.MAX_VALUE)));
+            ranges.add(Range.openClosed(BigInteger.valueOf(Long.MIN_VALUE), end));
+        }
+        else
+        {
+            ranges.add(Range.openClosed(start, end));
+        }
+        return ranges;
     }
 
     public Dataset<org.apache.spark.sql.Row> generateData(SparkSession spark)
@@ -190,97 +258,37 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         assertTrue(rows.isEmpty());
     }
 
-    public void validateTransientNodeData(VertxTestContext context,
-                                          QualifiedTableName table,
-                                          List<IUpgradeableInstance> transientNodes) throws Exception
+    public void validateNodeSpecificData(QualifiedTableName table,
+                                         Map<IUpgradeableInstance, Set<String>> expectedInstanceData)
     {
-        validateTransientNodeData(context, table, transientNodes, false);
+        validateNodeSpecificData(table, expectedInstanceData, true);
     }
-    public void validateTransientNodeData(VertxTestContext context,
-                                           QualifiedTableName table,
-                                           List<IUpgradeableInstance> transientNodes,
-                                          boolean isMoving) throws Exception
+    public void validateNodeSpecificData(QualifiedTableName table,
+                                         Map<IUpgradeableInstance, Set<String>> expectedInstanceData,
+                                         boolean hasNewNodes)
     {
-        List<Tuple2<DecoratedKey, Object[]>> tupleData = generateData(rowCount);
-        retrieveMappingWithKeyspace(context, TEST_KEYSPACE, response -> {
-            TokenRangeReplicasResponse mappingResponse = response.bodyAsJson(TokenRangeReplicasResponse.class);
-            assertThat(response.statusCode()).isEqualTo(HttpResponseStatus.OK.code());
-
-            for (IUpgradeableInstance instance : transientNodes)
+        for (IUpgradeableInstance instance : expectedInstanceData.keySet())
+        {
+            SimpleQueryResult qr = instance.executeInternalWithResult(String.format(retrieveRows, table.tableName()));
+            Set<String> rows = new HashSet<>();
+            while (qr.hasNext())
             {
-                validateRowsOnInstance(instance, table.tableName(), mappingResponse, tupleData, isMoving);
+                org.apache.cassandra.distributed.api.Row row = qr.next();
+                int id = row.getInteger("id");
+                String course = row.getString("course");
+                int marks = row.getInteger("marks");
+                rows.add(id + ":" + course + ":" + marks);
             }
 
-            context.completeNow();
-        });
-    }
-
-    public void validateRowsOnInstance(IUpgradeableInstance instance,
-                                       String tableName,
-                                       TokenRangeReplicasResponse tokenRangesResponse,
-                                       List<Tuple2<DecoratedKey, Object[]>> tupleData,
-                                       boolean isMoving)
-    {
-        Set<String> expectedRows = filterRowsForInstance(tokenRangesResponse,
-                                                         instance,
-                                                         tupleData);
-
-        SimpleQueryResult qr = instance.executeInternalWithResult(String.format(retrieveRows, tableName));
-        Set<String> rows = new HashSet<>();
-        while (qr.hasNext())
-        {
-            org.apache.cassandra.distributed.api.Row row = qr.next();
-            int id = row.getInteger("id");
-            String course = row.getString("course");
-            int marks = row.getInteger("marks");
-            rows.add(id + ":" + course + ":" + marks);
+            if (hasNewNodes)
+            {
+                assertThat(rows).containsExactlyInAnyOrderElementsOf(expectedInstanceData.get(instance));
+            }
+            else
+            {
+                assertThat(rows).containsAll(expectedInstanceData.get(instance));
+            }
         }
-
-        if (isMoving)
-        {
-            assertThat(rows).containsAll(expectedRows);
-        }
-        else
-        {
-            assertThat(rows).containsExactlyInAnyOrderElementsOf(expectedRows);
-        }
-    }
-
-    private Set<String> filterRowsForInstance(TokenRangeReplicasResponse mappingResponse,
-                                              IUpgradeableInstance instance,
-                                              List<Tuple2<DecoratedKey, Object[]>> tupleData)
-    {
-        List<Range<BigInteger>> ranges = getTokenRangesForInstance(mappingResponse, instance);
-        return ranges.stream()
-                     .map(r -> getDataForRange(tupleData, r))
-                     .flatMap(Collection::stream)
-                     .collect(Collectors.toSet());
-    }
-
-    private List<Range<BigInteger>> getTokenRangesForInstance(TokenRangeReplicasResponse mappingResponse,
-                                                              IUpgradeableInstance instance)
-    {
-        String instanceAddress = String.format("%s:%s",
-                                               instance.broadcastAddress().getAddress().getHostAddress(),
-                                               instance.broadcastAddress().getPort());
-        return mappingResponse.writeReplicas()
-                              .stream()
-                              .filter(i -> i.replicasByDatacenter().values().stream()
-                                            .flatMap(Collection::stream)
-                                            .anyMatch(ins -> ins.equals(instanceAddress)))
-                              .map(i -> Range.openClosed(BigInteger.valueOf(Long.parseLong(i.start())),
-                                                         BigInteger.valueOf(Long.parseLong(i.end()))))
-                              .collect(Collectors.toList());
-    }
-
-    void retrieveMappingWithKeyspace(VertxTestContext context, String keyspace,
-                                     Handler<HttpResponse<Buffer>> verifier) throws Exception
-    {
-        String testRoute = "/api/v1/keyspaces/" + keyspace + "/token-range-replicas";
-        testWithClient(context, client -> {
-            client.get(server.actualPort(), "127.0.0.1", testRoute)
-                  .send(context.succeeding(verifier));
-        });
     }
 
     protected UpgradeableCluster getMultiDCCluster(BiConsumer<ClassLoader, Integer> initializer,
@@ -318,13 +326,13 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         });
     }
 
-    protected QualifiedTableName bulkWriteData(boolean isCrossDCKeyspace, ConsistencyLevel writeCL)
+    protected QualifiedTableName bulkWriteData(ConsistencyLevel writeCL) throws InterruptedException
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         List<String> sidecarInstances = generateSidecarInstances((annotation.nodesPerDc() + annotation.newNodesPerDc()) * annotation.numDcs());
 
         ImmutableMap<String, Integer> rf;
-        if (annotation.numDcs() > 1 && isCrossDCKeyspace)
+        if (annotation.numDcs() > 1 && annotation.useCrossDcKeyspace())
         {
             rf = ImmutableMap.of("datacenter1", DEFAULT_RF, "datacenter2", DEFAULT_RF);
         }
@@ -334,6 +342,7 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         }
 
         QualifiedTableName schema = initializeSchema(rf);
+        Thread.sleep(2000);
 
         SparkConf sparkConf = generateSparkConf();
         SparkSession spark = generateSparkSession(sparkConf);
@@ -352,11 +361,6 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
 
         dfWriter.save();
         return schema;
-    }
-
-    protected QualifiedTableName bulkWriteData(ConsistencyLevel writeCL)
-    {
-        return bulkWriteData(false, writeCL);
     }
 
     protected List<String> generateSidecarInstances(int numNodes)

@@ -20,7 +20,9 @@ package org.apache.cassandra.analytics.expansion;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
@@ -29,7 +31,6 @@ import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Session;
-import io.vertx.junit5.VertxTestContext;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.analytics.TestTokenSupplier;
@@ -47,11 +48,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class JoiningBaseTest extends ResiliencyTestBase
 {
 
-    void runJoiningTestScenario(VertxTestContext context,
-                                CountDownLatch transientStateStart,
-                                CountDownLatch transientStateEnd,
+    void runJoiningTestScenario(CountDownLatch transitioningStateStart,
+                                CountDownLatch transitioningStateEnd,
                                 UpgradeableCluster cluster,
-                                boolean isCrossDCKeyspace,
                                 ConsistencyLevel readCL,
                                 ConsistencyLevel writeCL,
                                 boolean isFailure) throws Exception
@@ -59,28 +58,31 @@ public class JoiningBaseTest extends ResiliencyTestBase
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         QualifiedTableName table;
         List<IUpgradeableInstance> newInstances;
+        Map<IUpgradeableInstance, Set<String>> expectedInstanceData;
         try
         {
-            IUpgradeableInstance seed = cluster.get(1);
             newInstances = addNewInstances(cluster, annotation.newNodesPerDc(), annotation.numDcs());
 
-            Uninterruptibles.awaitUninterruptibly(transientStateStart, 2, TimeUnit.MINUTES);
+            Uninterruptibles.awaitUninterruptibly(transitioningStateStart, 2, TimeUnit.MINUTES);
 
-            newInstances.forEach(instance -> ClusterUtils.awaitRingState(seed, instance, "Joining"));
-            table = bulkWriteData(isCrossDCKeyspace, writeCL);
+            newInstances.forEach(instance -> ClusterUtils.awaitRingState(instance, instance, "Joining"));
+            table = bulkWriteData(writeCL);
+
+            expectedInstanceData = generateExpectedInstanceData(cluster, newInstances);
         }
         finally
         {
             for (int i = 0; i < (annotation.newNodesPerDc() * annotation.numDcs()); i++)
             {
-                transientStateEnd.countDown();
+                transitioningStateEnd.countDown();
             }
         }
 
         assertNotNull(table);
+
         Session session = maybeGetSession();
         validateData(session, table.tableName(), readCL);
-        validateTransientNodeData(context, table, newInstances);
+        validateNodeSpecificData(table, expectedInstanceData);
 
         // For tests that involve JOIN failures, we make a best-effort attempt to check if the node join has failed
         // by checking if the node has either left the ring or is still in JOINING state, but not NORMAL
@@ -122,11 +124,10 @@ public class JoiningBaseTest extends ResiliencyTestBase
         return newInstances;
     }
 
-    void runJoiningTestScenario(VertxTestContext context,
-                                ConfigurableCassandraTestContext cassandraTestContext,
+    void runJoiningTestScenario(ConfigurableCassandraTestContext cassandraTestContext,
                                 BiConsumer<ClassLoader, Integer> instanceInitializer,
-                                CountDownLatch transientStateStart,
-                                CountDownLatch transientStateEnd,
+                                CountDownLatch transitioningStateStart,
+                                CountDownLatch transitioningStateEnd,
                                 ConsistencyLevel readCL,
                                 ConsistencyLevel writeCL,
                                 boolean isFailure)
@@ -144,11 +145,9 @@ public class JoiningBaseTest extends ResiliencyTestBase
             builder.withTokenSupplier(tokenSupplier);
         });
 
-        runJoiningTestScenario(context,
-                               transientStateStart,
-                               transientStateEnd,
+        runJoiningTestScenario(transitioningStateStart,
+                               transitioningStateEnd,
                                cluster,
-                               true,
                                readCL,
                                writeCL,
                                isFailure);

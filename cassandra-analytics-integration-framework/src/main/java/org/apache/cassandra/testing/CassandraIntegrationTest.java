@@ -60,6 +60,13 @@ public @interface CassandraIntegrationTest
     int numDcs() default 1;
 
     /**
+     * This is only applied in context of multi-DC tests. Returns true if the keyspace is replicated
+     * across multiple DCs. Defaults to {@code true}
+     * @return whether the multi-DC test uses a cross-DC keyspace
+     */
+    boolean useCrossDcKeyspace() default true;
+
+    /**
      * Returns the number of data directories to use per instance. Cassandra supports multiple data directories
      * for each instance. Defaults to 1 data directory per instance.
      *
@@ -124,4 +131,5 @@ public @interface CassandraIntegrationTest
      *         false if it should be run on the first version.
      */
     boolean versionDependent() default true;
+
 }

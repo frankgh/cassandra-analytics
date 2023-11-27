@@ -19,7 +19,9 @@
 package org.apache.cassandra.analytics.movement;
 
 import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
@@ -28,7 +30,6 @@ import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Session;
-import io.vertx.junit5.VertxTestContext;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.analytics.TestTokenSupplier;
@@ -47,12 +48,10 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
     public static final int MULTI_DC_MOVING_NODE_IDX = 3;
 
     // CHECKSTYLE IGNORE: Constructor with many parameters
-    void runMovingNodeTest(VertxTestContext context,
-                           ConfigurableCassandraTestContext cassandraTestContext,
+    void runMovingNodeTest(ConfigurableCassandraTestContext cassandraTestContext,
                            BiConsumer<ClassLoader, Integer> instanceInitializer,
-                           CountDownLatch transientStateStart,
-                           CountDownLatch transientStateEnd,
-                           boolean isCrossDCKeyspace,
+                           CountDownLatch transitioningStateStart,
+                           CountDownLatch transitioningStateEnd,
                            boolean isFailure,
                            ConsistencyLevel readCL,
                            ConsistencyLevel writeCL) throws Exception
@@ -84,7 +83,7 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
         long moveTarget = getMoveTargetToken(cluster);
         IUpgradeableInstance movingNode = cluster.get(movingNodeIndex);
         String initialToken = movingNode.config().getString("initial_token");
-
+        Map<IUpgradeableInstance, Set<String>> expectedInstanceData;
         try
         {
             IUpgradeableInstance seed = cluster.get(1);
@@ -93,13 +92,14 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
                                        .success()).start();
 
             // Wait until nodes have reached expected state
-            Uninterruptibles.awaitUninterruptibly(transientStateStart, 2, TimeUnit.MINUTES);
+            Uninterruptibles.awaitUninterruptibly(transitioningStateStart, 2, TimeUnit.MINUTES);
             ClusterUtils.awaitRingState(seed, movingNode, "Moving");
-            schema = bulkWriteData(isCrossDCKeyspace, writeCL);
+            schema = bulkWriteData(writeCL);
+            expectedInstanceData = generateExpectedInstanceData(cluster, Collections.singletonList(movingNode));
         }
         finally
         {
-            transientStateEnd.countDown();
+            transitioningStateEnd.countDown();
         }
 
         // It is only in successful MOVE operation that we validate that the node has reached NORMAL state
@@ -109,7 +109,7 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
         }
         Session session = maybeGetSession();
         validateData(session, schema.tableName(), readCL);
-        validateTransientNodeData(context, schema, Collections.singletonList(movingNode), true);
+        validateNodeSpecificData(schema, expectedInstanceData, false);
 
         // For tests that involve MOVE failures, we make a best-effort attempt by checking if the node is either
         // still MOVING or has flipped back to NORMAL state with the initial token that it previously held

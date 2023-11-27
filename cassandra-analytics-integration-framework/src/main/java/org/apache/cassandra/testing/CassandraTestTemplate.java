@@ -86,7 +86,8 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
      * @return the <em>context</em> of a single invocation of a
      * {@linkplain org.junit.jupiter.api.TestTemplate test template}
      */
-    private TestTemplateInvocationContext invocationContext(TestVersion version, ExtensionContext context)
+    private TestTemplateInvocationContext invocationContext(TestVersion version,
+                                                            ExtensionContext context)
     {
         return new CassandraTestTemplateInvocationContext(context, version);
     }
@@ -110,7 +111,8 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
         private final ExtensionContext context;
         private final TestVersion version;
 
-        private CassandraTestTemplateInvocationContext(ExtensionContext context, TestVersion version)
+        private CassandraTestTemplateInvocationContext(ExtensionContext context,
+                                                       TestVersion version)
         {
             this.context = context;
             this.version = version;
@@ -315,5 +317,8 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
         System.setProperty("cassandra.gossip_settle_min_wait_ms", "250"); // Default 5000
         System.setProperty("cassandra.gossip_settle_interval_ms", "125"); // Default 1000
         System.setProperty("cassandra.gossip_settle_poll_success_required", "6"); // Default 3
+        // Disable direct memory allocator as it doesn't release properly
+        System.setProperty("cassandra.netty_use_heap_allocator", "true");
+
     }
 }

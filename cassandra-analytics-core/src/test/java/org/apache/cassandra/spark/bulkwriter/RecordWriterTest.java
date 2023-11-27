@@ -46,6 +46,7 @@ import scala.Tuple2;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.startsWith;
+import static org.hamcrest.Matchers.endsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -82,6 +83,28 @@ public class RecordWriterTest
         tc = new TestTaskContext();
         range = writerContext.job().getTokenPartitioner().getTokenRange(tc.partitionId());
         tokenizer = new Tokenizer(writerContext);
+    }
+
+    @Test
+    public void testWriteFailWhenTopologyChangeWithinTask()
+    {
+        // Generate token range mapping to simulate node movement of the first node by assigning it a different token
+        // within the same partition
+        int moveTargetToken = 50000;
+        TokenRangeMapping<RingInstance> testMapping =
+        TokenRangeMappingUtils.buildTokenRangeMapping(100000,
+                                                      ImmutableMap.of("DC1", 3),
+                                                      12,
+                                                      true,
+                                                      moveTargetToken);
+
+        MockBulkWriterContext m = Mockito.spy(writerContext);
+        rw = new RecordWriter(m, COLUMN_NAMES, () -> tc, SSTableWriter::new);
+
+        when(m.getTokenRangeMapping(false)).thenCallRealMethod().thenReturn(testMapping);
+        Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, true);
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> rw.write(data));
+        assertThat(ex.getMessage(), endsWith("Token range mappings have changed since the task started"));
     }
 
     @Test

@@ -23,11 +23,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 
 import com.google.common.util.concurrent.Uninterruptibles;
-import org.junit.jupiter.api.extension.ExtendWith;
 
 import com.datastax.driver.core.ConsistencyLevel;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -44,15 +41,13 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
 
-@ExtendWith(VertxExtension.class)
 public class JoiningDoubleClusterTest extends JoiningBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
+    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperDoubleClusterSize.reset();
-        runJoiningTestScenario(context,
-                               cassandraTestContext,
+        runJoiningTestScenario(cassandraTestContext,
                                BBHelperDoubleClusterSize::install,
                                BBHelperDoubleClusterSize.transientStateStart,
                                BBHelperDoubleClusterSize.transientStateEnd,
@@ -62,11 +57,10 @@ public class JoiningDoubleClusterTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
+    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperDoubleClusterSizeFailure.reset();
-        runJoiningTestScenario(context,
-                               cassandraTestContext,
+        runJoiningTestScenario(cassandraTestContext,
                                BBHelperDoubleClusterSizeFailure::install,
                                BBHelperDoubleClusterSizeFailure.transientStateStart,
                                BBHelperDoubleClusterSizeFailure.transientStateEnd,
@@ -76,11 +70,10 @@ public class JoiningDoubleClusterTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
+    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperDoubleClusterSize.reset();
-        runJoiningTestScenario(context,
-                               cassandraTestContext,
+        runJoiningTestScenario(cassandraTestContext,
                                BBHelperDoubleClusterSize::install,
                                BBHelperDoubleClusterSize.transientStateStart,
                                BBHelperDoubleClusterSize.transientStateEnd,
@@ -90,11 +83,10 @@ public class JoiningDoubleClusterTest extends JoiningBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
+    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperDoubleClusterSizeFailure.reset();
-        runJoiningTestScenario(context,
-                               cassandraTestContext,
+        runJoiningTestScenario(cassandraTestContext,
                                BBHelperDoubleClusterSizeFailure::install,
                                BBHelperDoubleClusterSizeFailure.transientStateStart,
                                BBHelperDoubleClusterSizeFailure.transientStateEnd,

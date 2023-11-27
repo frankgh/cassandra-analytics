@@ -21,7 +21,9 @@ package org.apache.cassandra.analytics.replacement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
@@ -31,7 +33,6 @@ import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Session;
-import io.vertx.junit5.VertxTestContext;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.analytics.TestTokenSupplier;
@@ -52,25 +53,21 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
 {
 
     // CHECKSTYLE IGNORE: Method with many parameters
-    void runReplacementTest(VertxTestContext context,
-                            ConfigurableCassandraTestContext cassandraTestContext,
+    void runReplacementTest(ConfigurableCassandraTestContext cassandraTestContext,
                             BiConsumer<ClassLoader, Integer> instanceInitializer,
-                            CountDownLatch transientStateStart,
-                            CountDownLatch transientStateEnd,
+                            CountDownLatch transitioningStateStart,
+                            CountDownLatch transitioningStateEnd,
                             CountDownLatch nodeStart,
-                            boolean isCrossDCKeyspace,
                             boolean isFailure,
                             ConsistencyLevel readCL,
                             ConsistencyLevel writeCL) throws Exception
     {
-        runReplacementTest(context,
-                           cassandraTestContext,
+        runReplacementTest(cassandraTestContext,
                            instanceInitializer,
-                           transientStateStart,
-                           transientStateEnd,
+                           transitioningStateStart,
+                           transitioningStateEnd,
                            nodeStart,
                            0,
-                           isCrossDCKeyspace,
                            isFailure,
                            false,
                            readCL,
@@ -78,14 +75,12 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
     }
 
     // CHECKSTYLE IGNORE: Method with many parameters
-    void runReplacementTest(VertxTestContext context,
-                            ConfigurableCassandraTestContext cassandraTestContext,
+    void runReplacementTest(ConfigurableCassandraTestContext cassandraTestContext,
                             BiConsumer<ClassLoader, Integer> instanceInitializer,
-                            CountDownLatch transientStateStart,
-                            CountDownLatch transientStateEnd,
+                            CountDownLatch transitioningStateStart,
+                            CountDownLatch transitioningStateEnd,
                             CountDownLatch nodeStart,
                             int additionalNodesToStop,
-                            boolean isCrossDCKeyspace,
                             boolean isFailure,
                             boolean shouldWriteFail,
                             ConsistencyLevel readCL,
@@ -113,7 +108,7 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                                                                .getAddress()
                                                                .getHostAddress())
                                                          .collect(Collectors.toList());
-
+        Map<IUpgradeableInstance, Set<String>> expectedInstanceData;
         try
         {
             IUpgradeableInstance seed = cluster.get(1);
@@ -134,7 +129,7 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
             newNodes = startReplacementNodes(nodeStart, cluster, nodesToRemove);
 
             // Wait until replacement nodes are in JOINING state
-            Uninterruptibles.awaitUninterruptibly(transientStateStart, 2, TimeUnit.MINUTES);
+            Uninterruptibles.awaitUninterruptibly(transitioningStateStart, 2, TimeUnit.MINUTES);
 
             // Verify state of replacement nodes
             for (IUpgradeableInstance newInstance : newNodes)
@@ -143,7 +138,7 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                 ClusterUtils.awaitGossipStatus(newInstance, newInstance, "BOOT_REPLACE");
 
                 String newAddress = newInstance.config().broadcastAddress().getAddress().getHostAddress();
-                Optional<ClusterUtils.RingInstanceDetails> replacementInstance = getMatchingInstanceFromRing(seed, newAddress);
+                Optional<ClusterUtils.RingInstanceDetails> replacementInstance = getMatchingInstanceFromRing(newInstance, newAddress);
                 assertThat(replacementInstance).isPresent();
                 // Verify that replacement node tokens match the removed nodes
                 assertThat(removedNodeTokens).contains(replacementInstance.get().getToken());
@@ -152,56 +147,62 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
             // It is only in the event we have insufficient nodes, we expect write job to fail
             if (shouldWriteFail)
             {
-                assertThrows(RuntimeException.class, () -> bulkWriteData(isCrossDCKeyspace, writeCL));
+                assertThrows(RuntimeException.class, () -> bulkWriteData(writeCL));
+                return;
             }
             else
             {
-                schema = bulkWriteData(isCrossDCKeyspace, writeCL);
+                schema = bulkWriteData(writeCL);
             }
 
+            expectedInstanceData = getInstanceData(newNodes, true);
         }
         finally
         {
             for (int i = 0; i < (annotation.newNodesPerDc() * annotation.numDcs()); i++)
             {
-                transientStateEnd.countDown();
+                transitioningStateEnd.countDown();
             }
         }
 
-        if (!shouldWriteFail)
+        // It is only in successful REPLACE operation that we validate that the node has reached NORMAL state
+        if (!isFailure)
         {
-            // It is only in successful REPLACE operation that we validate that the node has reached NORMAL state
-            if (!isFailure)
-            {
-                ClusterUtils.awaitRingState(cluster.get(1), newNodes.get(0), "Normal");
-            }
+            ClusterUtils.awaitRingState(newNodes.get(0), newNodes.get(0), "Normal");
 
-            Session session = maybeGetSession();
-            validateData(session, schema.tableName(), readCL);
-            validateTransientNodeData(context, schema, newNodes);
-
+            // Validate if data was written to the new transitioning nodes only when bootstrap succeeded
+            validateNodeSpecificData(schema, expectedInstanceData);
+        }
+        else
+        {
             // For replacement failure cases, we make a best-effort attempt to validate that
             // 1) replacement node is not NORMAL, and 2) removed node is DOWN
             // This is to work around the non-deterministic nature of gossip settling
-            if (isFailure)
+            Optional<ClusterUtils.RingInstanceDetails> replacementNode =
+            getMatchingInstanceFromRing(newNodes.get(0), newNodes.get(0).broadcastAddress().getAddress().getHostAddress());
+            // Validate that the replacement node did not succeed in joining (if still visible in ring)
+            if (replacementNode.isPresent())
             {
-                Optional<ClusterUtils.RingInstanceDetails> replacementNode =
-                getMatchingInstanceFromRing(cluster.get(1), newNodes.get(0).broadcastAddress().getAddress().getHostAddress());
-                // Validate that the replacement node did not succeed in joining (if still visible in ring)
-                if (replacementNode.isPresent())
-                {
-                    assertThat(replacementNode.get().getState()).isNotEqualTo("Normal");
-                }
+                assertThat(replacementNode.get().getState()).isNotEqualTo("Normal");
+            }
 
-                Optional<ClusterUtils.RingInstanceDetails> removedNode =
-                getMatchingInstanceFromRing(cluster.get(1), removedNodeAddresses.get(0));
-                // Validate that the removed node is "Down" (if still visible in ring)
-                if (removedNode.isPresent())
-                {
-                    assertThat(removedNode.get().getStatus()).isEqualTo("Down");
-                }
+            Optional<ClusterUtils.RingInstanceDetails> removedNode =
+            getMatchingInstanceFromRing(cluster.get(1), removedNodeAddresses.get(0));
+            // Validate that the removed node is "Down" (if still visible in ring)
+            if (removedNode.isPresent())
+            {
+                assertThat(removedNode.get().getStatus()).isEqualTo("Down");
+            }
+
+            if (readCL == ConsistencyLevel.ALL)
+            {
+                // No more validations to be performed if CL is ALL and replacement fails
+                return;
             }
         }
+
+        Session session = maybeGetSession();
+        validateData(session, schema.tableName(), readCL);
     }
 
     private List<IUpgradeableInstance> startReplacementNodes(CountDownLatch nodeStart,
@@ -247,12 +248,12 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
         return newNodes;
     }
 
-    private void stopNodes(IUpgradeableInstance seed, List<IUpgradeableInstance> removedNodes)
+    private void stopNodes(IUpgradeableInstance seed, List<IUpgradeableInstance> nodesToRemove)
     {
-        for (IUpgradeableInstance nodeToRemove : removedNodes)
+        for (IUpgradeableInstance node : nodesToRemove)
         {
-            ClusterUtils.stopUnchecked(nodeToRemove);
-            String remAddress = nodeToRemove.config().broadcastAddress().getAddress().getHostAddress();
+            ClusterUtils.stopUnchecked(node);
+            String remAddress = node.config().broadcastAddress().getAddress().getHostAddress();
 
             List<ClusterUtils.RingInstanceDetails> ring = ClusterUtils.ring(seed);
             List<ClusterUtils.RingInstanceDetails> match = ring.stream()

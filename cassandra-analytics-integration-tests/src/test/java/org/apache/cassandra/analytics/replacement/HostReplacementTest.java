@@ -24,11 +24,7 @@ import java.util.concurrent.CountDownLatch;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
-import org.junit.jupiter.api.extension.ExtendWith;
-
 import com.datastax.driver.core.ConsistencyLevel;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -44,22 +40,17 @@ import org.apache.cassandra.utils.Shared;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
-@ExtendWith(VertxExtension.class)
 public class HostReplacementTest extends HostReplacementBaseTest
 {
-
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void hostReplacementQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext,
-                                           VertxTestContext context) throws Exception
+    void hostReplacementQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperReplacementsNode.reset();
-        runReplacementTest(context,
-                           cassandraTestContext,
+        runReplacementTest(cassandraTestContext,
                            BBHelperReplacementsNode::install,
-                           BBHelperReplacementsNode.transientStateStart,
-                           BBHelperReplacementsNode.transientStateEnd,
+                           BBHelperReplacementsNode.transitioningStateStart,
+                           BBHelperReplacementsNode.transitioningStateEnd,
                            BBHelperReplacementsNode.nodeStart,
-                           false,
                            false,
                            ConsistencyLevel.QUORUM,
                            ConsistencyLevel.QUORUM);
@@ -67,34 +58,28 @@ public class HostReplacementTest extends HostReplacementBaseTest
 
     // Note: The following test depends on sidecar fix: https://issues.apache.org/jira/browse/CASSANDRASC-78
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void hostReplacementOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext,
-                                        VertxTestContext context) throws Exception
+    void hostReplacementOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperReplacementsNode.reset();
-        runReplacementTest(context,
-                           cassandraTestContext,
+        runReplacementTest(cassandraTestContext,
                            BBHelperReplacementsNode::install,
-                           BBHelperReplacementsNode.transientStateStart,
-                           BBHelperReplacementsNode.transientStateEnd,
+                           BBHelperReplacementsNode.transitioningStateStart,
+                           BBHelperReplacementsNode.transitioningStateEnd,
                            BBHelperReplacementsNode.nodeStart,
-                           false,
                            false,
                            ConsistencyLevel.ONE,
                            ConsistencyLevel.ALL);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void hostReplacementFailureQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext,
-                                                  VertxTestContext context) throws Exception
+    void hostReplacementFailureQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperReplacementsNodeFailure.reset();
-        runReplacementTest(context,
-                           cassandraTestContext,
+        runReplacementTest(cassandraTestContext,
                            BBHelperReplacementsNodeFailure::install,
-                           BBHelperReplacementsNodeFailure.transientStateStart,
-                           BBHelperReplacementsNodeFailure.transientStateEnd,
+                           BBHelperReplacementsNodeFailure.transitioningStateStart,
+                           BBHelperReplacementsNodeFailure.transitioningStateEnd,
                            BBHelperReplacementsNodeFailure.nodeStart,
-                           false,
                            true,
                            ConsistencyLevel.QUORUM,
                            ConsistencyLevel.QUORUM);
@@ -102,17 +87,14 @@ public class HostReplacementTest extends HostReplacementBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void hostReplacementFailureOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext,
-                                               VertxTestContext context) throws Exception
+    void hostReplacementFailureOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperReplacementsNodeFailure.reset();
-        runReplacementTest(context,
-                           cassandraTestContext,
+        runReplacementTest(cassandraTestContext,
                            BBHelperReplacementsNodeFailure::install,
-                           BBHelperReplacementsNodeFailure.transientStateStart,
-                           BBHelperReplacementsNodeFailure.transientStateEnd,
+                           BBHelperReplacementsNodeFailure.transitioningStateStart,
+                           BBHelperReplacementsNodeFailure.transitioningStateEnd,
                            BBHelperReplacementsNodeFailure.nodeStart,
-                           false,
                            true,
                            ConsistencyLevel.ONE,
                            ConsistencyLevel.ALL);
@@ -128,8 +110,8 @@ public class HostReplacementTest extends HostReplacementBaseTest
         // Additional latch used here to sequentially start the 2 new nodes to isolate the loading
         // of the shared Cassandra system property REPLACE_ADDRESS_FIRST_BOOT across instances
         static CountDownLatch nodeStart = new CountDownLatch(1);
-        static CountDownLatch transientStateStart = new CountDownLatch(1);
-        static CountDownLatch transientStateEnd = new CountDownLatch(1);
+        static CountDownLatch transitioningStateStart = new CountDownLatch(1);
+        static CountDownLatch transitioningStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -156,16 +138,16 @@ public class HostReplacementTest extends HostReplacementBaseTest
             boolean result = orig.call();
             nodeStart.countDown();
             // trigger bootstrap start and wait until bootstrap is ready from test
-            transientStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            transitioningStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd);
             return result;
         }
 
         public static void reset()
         {
             nodeStart = new CountDownLatch(1);
-            transientStateStart = new CountDownLatch(1);
-            transientStateEnd = new CountDownLatch(1);
+            transitioningStateStart = new CountDownLatch(1);
+            transitioningStateEnd = new CountDownLatch(1);
         }
     }
 
@@ -178,8 +160,8 @@ public class HostReplacementTest extends HostReplacementBaseTest
         // Additional latch used here to sequentially start the 2 new nodes to isolate the loading
         // of the shared Cassandra system property REPLACE_ADDRESS_FIRST_BOOT across instances
         static CountDownLatch nodeStart = new CountDownLatch(1);
-        static CountDownLatch transientStateStart = new CountDownLatch(1);
-        static CountDownLatch transientStateEnd = new CountDownLatch(1);
+        static CountDownLatch transitioningStateStart = new CountDownLatch(1);
+        static CountDownLatch transitioningStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -206,8 +188,8 @@ public class HostReplacementTest extends HostReplacementBaseTest
             boolean result = orig.call();
             nodeStart.countDown();
             // trigger bootstrap start and wait until bootstrap is ready from test
-            transientStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            transitioningStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd);
             throw new UnsupportedOperationException("Simulated failure");
             // return result;
         }
@@ -215,8 +197,8 @@ public class HostReplacementTest extends HostReplacementBaseTest
         public static void reset()
         {
             nodeStart = new CountDownLatch(1);
-            transientStateStart = new CountDownLatch(1);
-            transientStateEnd = new CountDownLatch(1);
+            transitioningStateStart = new CountDownLatch(1);
+            transitioningStateEnd = new CountDownLatch(1);
         }
     }
 }

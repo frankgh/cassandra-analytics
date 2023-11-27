@@ -25,11 +25,7 @@ import java.util.concurrent.Future;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
-import org.junit.jupiter.api.extension.ExtendWith;
-
 import com.datastax.driver.core.ConsistencyLevel;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -44,81 +40,68 @@ import org.apache.cassandra.utils.Shared;
 
 import static net.bytebuddy.matcher.ElementMatchers.named;
 
-@ExtendWith(VertxExtension.class)
 public class NodeMovementTest extends NodeMovementBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void moveNodeQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
+    void moveNodeQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMovingNode.reset();
-        runMovingNodeTest(context,
-                          cassandraTestContext,
+        runMovingNodeTest(cassandraTestContext,
                           BBHelperMovingNode::install,
-                          BBHelperMovingNode.transientStateStart,
-                          BBHelperMovingNode.transientStateEnd,
-                          false,
+                          BBHelperMovingNode.transitioningStateStart,
+                          BBHelperMovingNode.transitioningStateEnd,
                           false,
                           ConsistencyLevel.QUORUM,
                           ConsistencyLevel.QUORUM);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void moveNodeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext,
-                                 VertxTestContext context) throws Exception
+    void moveNodeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMovingNode.reset();
-        runMovingNodeTest(context,
-                          cassandraTestContext,
+        runMovingNodeTest(cassandraTestContext,
                           BBHelperMovingNode::install,
-                          BBHelperMovingNode.transientStateStart,
-                          BBHelperMovingNode.transientStateEnd,
-                          false,
+                          BBHelperMovingNode.transitioningStateStart,
+                          BBHelperMovingNode.transitioningStateEnd,
                           false,
                           ConsistencyLevel.ONE,
                           ConsistencyLevel.ALL);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void moveNodeAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
+    void moveNodeAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMovingNode.reset();
-        runMovingNodeTest(context,
-                          cassandraTestContext,
+        runMovingNodeTest(cassandraTestContext,
                           BBHelperMovingNode::install,
-                          BBHelperMovingNode.transientStateStart,
-                          BBHelperMovingNode.transientStateEnd,
-                          false,
+                          BBHelperMovingNode.transitioningStateStart,
+                          BBHelperMovingNode.transitioningStateEnd,
                           false,
                           ConsistencyLevel.ALL,
                           ConsistencyLevel.ONE);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void moveNodeFailureQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext,
-                                           VertxTestContext context) throws Exception
+    void moveNodeFailureQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMovingNodeFailure.reset();
-        runMovingNodeTest(context,
-                          cassandraTestContext,
+        runMovingNodeTest(cassandraTestContext,
                           BBHelperMovingNodeFailure::install,
-                          BBHelperMovingNodeFailure.transientStateStart,
-                          BBHelperMovingNodeFailure.transientStateEnd,
-                          false,
+                          BBHelperMovingNodeFailure.transitioningStateStart,
+                          BBHelperMovingNodeFailure.transitioningStateEnd,
                           true,
                           ConsistencyLevel.QUORUM,
                           ConsistencyLevel.QUORUM);
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void moveNodeFailureOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, VertxTestContext context) throws Exception
+    void moveNodeFailureOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMovingNodeFailure.reset();
-        runMovingNodeTest(context,
-                          cassandraTestContext,
+        runMovingNodeTest(cassandraTestContext,
                           BBHelperMovingNodeFailure::install,
-                          BBHelperMovingNodeFailure.transientStateStart,
-                          BBHelperMovingNodeFailure.transientStateEnd,
-                          false,
+                          BBHelperMovingNodeFailure.transitioningStateStart,
+                          BBHelperMovingNodeFailure.transitioningStateEnd,
                           true,
                           ConsistencyLevel.ONE,
                           ConsistencyLevel.ALL);
@@ -130,8 +113,8 @@ public class NodeMovementTest extends NodeMovementBaseTest
     @Shared
     public static class BBHelperMovingNodeFailure
     {
-        static CountDownLatch transientStateStart = new CountDownLatch(1);
-        static CountDownLatch transientStateEnd = new CountDownLatch(1);
+        static CountDownLatch transitioningStateStart = new CountDownLatch(1);
+        static CountDownLatch transitioningStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -154,16 +137,16 @@ public class NodeMovementTest extends NodeMovementBaseTest
         public static Future<?> stream(@SuperCall Callable<Future<?>> orig) throws Exception
         {
             Future<?> res = orig.call();
-            transientStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            transitioningStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd);
 
             throw new IOException("Simulated node movement failures"); // Throws exception to nodetool
         }
 
         public static void reset()
         {
-            transientStateStart = new CountDownLatch(1);
-            transientStateEnd = new CountDownLatch(1);
+            transitioningStateStart = new CountDownLatch(1);
+            transitioningStateEnd = new CountDownLatch(1);
         }
     }
 
@@ -174,8 +157,8 @@ public class NodeMovementTest extends NodeMovementBaseTest
     @Shared
     public static class BBHelperMovingNode
     {
-        static CountDownLatch transientStateStart = new CountDownLatch(1);
-        static CountDownLatch transientStateEnd = new CountDownLatch(1);
+        static CountDownLatch transitioningStateStart = new CountDownLatch(1);
+        static CountDownLatch transitioningStateEnd = new CountDownLatch(1);
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
@@ -198,15 +181,15 @@ public class NodeMovementTest extends NodeMovementBaseTest
         public static Future<?> stream(@SuperCall Callable<Future<?>> orig) throws Exception
         {
             Future<?> res = orig.call();
-            transientStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            transitioningStateStart.countDown();
+            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd);
             return res;
         }
 
         public static void reset()
         {
-            transientStateStart = new CountDownLatch(1);
-            transientStateEnd = new CountDownLatch(1);
+            transitioningStateStart = new CountDownLatch(1);
+            transitioningStateEnd = new CountDownLatch(1);
         }
     }
 }

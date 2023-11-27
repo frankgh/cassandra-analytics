@@ -20,6 +20,7 @@ package org.apache.cassandra.analytics.shrink;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Collectors;
@@ -28,7 +29,6 @@ import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import com.datastax.driver.core.Session;
-import io.vertx.junit5.VertxTestContext;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.distributed.UpgradeableCluster;
@@ -41,10 +41,9 @@ import static org.junit.Assert.assertTrue;
 
 class LeavingBaseTest extends ResiliencyTestBase
 {
-    void runLeavingTestScenario(VertxTestContext context,
-                                int leavingNodesPerDC,
-                                CountDownLatch transientStateStart,
-                                CountDownLatch transientStateEnd,
+    void runLeavingTestScenario(int leavingNodesPerDC,
+                                CountDownLatch transitioningStateStart,
+                                CountDownLatch transitioningStateEnd,
                                 UpgradeableCluster cluster,
                                 ConsistencyLevel readCL,
                                 ConsistencyLevel writeCL,
@@ -53,43 +52,43 @@ class LeavingBaseTest extends ResiliencyTestBase
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         QualifiedTableName table;
         List<IUpgradeableInstance> leavingNodes;
+        Map<IUpgradeableInstance, Set<String>> expectedInstanceData;
         try
         {
             IUpgradeableInstance seed = cluster.get(1);
-            leavingNodes = stopNodes(cluster, leavingNodesPerDC, annotation.numDcs());
+            leavingNodes = decommissionNodes(cluster, leavingNodesPerDC, annotation.numDcs());
 
             // Wait until nodes have reached expected state
-            Uninterruptibles.awaitUninterruptibly(transientStateStart);
+            Uninterruptibles.awaitUninterruptibly(transitioningStateStart);
 
             leavingNodes.forEach(instance -> ClusterUtils.awaitRingState(seed, instance, "Leaving"));
-            table = bulkWriteData(annotation.numDcs() > 1, writeCL);
+            table = bulkWriteData(writeCL);
+
+            List<IUpgradeableInstance> instances = cluster.stream().collect(Collectors.toList());
+            expectedInstanceData = generateExpectedInstanceData(cluster, leavingNodes);
         }
         finally
         {
             for (int i = 0; i < leavingNodesPerDC; i++)
             {
-                transientStateEnd.countDown();
+                transitioningStateEnd.countDown();
             }
         }
 
         Session session = maybeGetSession();
         assertNotNull(table);
         validateData(session, table.tableName(), readCL);
+        validateNodeSpecificData(table, expectedInstanceData, false);
 
         // For tests that involve LEAVE failures, we validate that the leaving nodes are part of the cluster
         if (isFailure)
         {
             // check leave node are part of cluster when leave fails
             assertTrue(areLeavingNodesPartOfCluster(cluster.get(1), leavingNodes));
-            context.completeNow();
-        }
-        else
-        {
-            validateTransientNodeData(context, table, leavingNodes);
         }
     }
 
-    private List<IUpgradeableInstance> stopNodes(UpgradeableCluster cluster, int leavingNodesPerDC, int numDcs)
+    private List<IUpgradeableInstance> decommissionNodes(UpgradeableCluster cluster, int leavingNodesPerDC, int numDcs)
     {
         List<IUpgradeableInstance> leavingNodes = new ArrayList<>();
         for (int i = 0; i < leavingNodesPerDC * numDcs; i++)

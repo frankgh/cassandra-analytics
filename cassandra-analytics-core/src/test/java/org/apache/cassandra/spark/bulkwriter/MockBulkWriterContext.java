@@ -265,7 +265,7 @@ public class MockBulkWriterContext implements BulkWriterContext, ClusterInfo, Jo
     @Override
     public TokenRangeMapping<RingInstance> getTokenRangeMapping(boolean cached)
     {
-        return (TokenRangeMapping<RingInstance>) tokenRangeMapping;
+        return tokenRangeMapping;
     }
 
     @Override

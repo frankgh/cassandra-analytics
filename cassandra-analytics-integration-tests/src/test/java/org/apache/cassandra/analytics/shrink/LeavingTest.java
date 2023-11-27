@@ -24,11 +24,7 @@ import java.util.function.BiConsumer;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
-import org.junit.jupiter.api.extension.ExtendWith;
-
 import com.datastax.driver.core.ConsistencyLevel;
-import io.vertx.junit5.VertxExtension;
-import io.vertx.junit5.VertxTestContext;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
@@ -46,16 +42,13 @@ import org.apache.cassandra.utils.Shared;
 
 import static net.bytebuddy.matcher.ElementMatchers.named;
 
-@ExtendWith(VertxExtension.class)
 class LeavingTest extends LeavingBaseTest
 {
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void singleLeavingNodeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext,
-                                          VertxTestContext context) throws Exception
+    void singleLeavingNodeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleLeavingNode.reset();
-        runLeavingTestScenario(context,
-                               cassandraTestContext,
+        runLeavingTestScenario(cassandraTestContext,
                                1,
                                BBHelperSingleLeavingNode::install,
                                BBHelperSingleLeavingNode.transientStateStart,
@@ -66,12 +59,10 @@ class LeavingTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void singleLeavingNodeOneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext,
-                                                 VertxTestContext context) throws Exception
+    void singleLeavingNodeOneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleLeavingNodeFailure.reset();
-        runLeavingTestScenario(context,
-                               cassandraTestContext,
+        runLeavingTestScenario(cassandraTestContext,
                                1,
                                BBHelperSingleLeavingNodeFailure::install,
                                BBHelperSingleLeavingNodeFailure.transientStateStart,
@@ -82,12 +73,10 @@ class LeavingTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void singleLeavingNodeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext,
-                                                VertxTestContext context) throws Exception
+    void singleLeavingNodeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleLeavingNode.reset();
-        runLeavingTestScenario(context,
-                               cassandraTestContext,
+        runLeavingTestScenario(cassandraTestContext,
                                1,
                                BBHelperSingleLeavingNode::install,
                                BBHelperSingleLeavingNode.transientStateStart,
@@ -98,12 +87,10 @@ class LeavingTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void singleLeavingNodeQuorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext,
-                                                       VertxTestContext context) throws Exception
+    void singleLeavingNodeQuorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperSingleLeavingNodeFailure.reset();
-        runLeavingTestScenario(context,
-                               cassandraTestContext,
+        runLeavingTestScenario(cassandraTestContext,
                                1,
                                BBHelperSingleLeavingNodeFailure::install,
                                BBHelperSingleLeavingNodeFailure.transientStateStart,
@@ -114,12 +101,10 @@ class LeavingTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void multipleLeavingNodesOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext,
-                                             VertxTestContext context) throws Exception
+    void multipleLeavingNodesOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMultipleLeavingNodes.reset();
-        runLeavingTestScenario(context,
-                               cassandraTestContext,
+        runLeavingTestScenario(cassandraTestContext,
                                2,
                                BBHelperMultipleLeavingNodes::install,
                                BBHelperMultipleLeavingNodes.transientStateStart,
@@ -130,12 +115,10 @@ class LeavingTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void multipleLeavingNodesOneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext,
-                                                    VertxTestContext context) throws Exception
+    void multipleLeavingNodesOneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMultipleLeavingNodesFailure.reset();
-        runLeavingTestScenario(context,
-                               cassandraTestContext,
+        runLeavingTestScenario(cassandraTestContext,
                                2,
                                BBHelperMultipleLeavingNodesFailure::install,
                                BBHelperMultipleLeavingNodesFailure.transientStateStart,
@@ -146,12 +129,10 @@ class LeavingTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void multipleLeavingNodesQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext,
-                                                   VertxTestContext context) throws Exception
+    void multipleLeavingNodesQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMultipleLeavingNodes.reset();
-        runLeavingTestScenario(context,
-                               cassandraTestContext,
+        runLeavingTestScenario(cassandraTestContext,
                                2,
                                BBHelperMultipleLeavingNodes::install,
                                BBHelperMultipleLeavingNodes.transientStateStart,
@@ -162,12 +143,10 @@ class LeavingTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
-    void multipleLeavingNodesQuorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext,
-                                                          VertxTestContext context) throws Exception
+    void multipleLeavingNodesQuorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperMultipleLeavingNodesFailure.reset();
-        runLeavingTestScenario(context,
-                               cassandraTestContext,
+        runLeavingTestScenario(cassandraTestContext,
                                2,
                                BBHelperMultipleLeavingNodesFailure::install,
                                BBHelperMultipleLeavingNodesFailure.transientStateStart,
@@ -178,12 +157,10 @@ class LeavingTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, network = true, gossip = true, buildCluster = false)
-    void halveClusterSizeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext,
-                                         VertxTestContext context) throws Exception
+    void halveClusterSizeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperHalveClusterSize.reset();
-        runLeavingTestScenario(context,
-                               cassandraTestContext,
+        runLeavingTestScenario(cassandraTestContext,
                                3,
                                BBHelperHalveClusterSize::install,
                                BBHelperHalveClusterSize.transientStateStart,
@@ -194,12 +171,10 @@ class LeavingTest extends LeavingBaseTest
     }
 
     @CassandraIntegrationTest(nodesPerDc = 6, network = true, gossip = true, buildCluster = false)
-    void halveClusterSizeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext,
-                                               VertxTestContext context) throws Exception
+    void halveClusterSizeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
     {
         BBHelperHalveClusterSize.reset();
-        runLeavingTestScenario(context,
-                               cassandraTestContext,
+        runLeavingTestScenario(cassandraTestContext,
                                3,
                                BBHelperHalveClusterSize::install,
                                BBHelperHalveClusterSize.transientStateStart,
@@ -210,8 +185,7 @@ class LeavingTest extends LeavingBaseTest
     }
 
     // CHECKSTYLE IGNORE: Method with many parameters
-    void runLeavingTestScenario(VertxTestContext context,
-                                ConfigurableCassandraTestContext cassandraTestContext,
+    void runLeavingTestScenario(ConfigurableCassandraTestContext cassandraTestContext,
                                 int leavingNodesPerDC,
                                 BiConsumer<ClassLoader, Integer> instanceInitializer,
                                 CountDownLatch transientStateStart,
@@ -232,8 +206,7 @@ class LeavingTest extends LeavingBaseTest
             builder.withInstanceInitializer(instanceInitializer);
             builder.withTokenSupplier(tokenSupplier);
         });
-        runLeavingTestScenario(context,
-                               leavingNodesPerDC,
+        runLeavingTestScenario(leavingNodesPerDC,
                                transientStateStart,
                                transientStateEnd,
                                cluster,

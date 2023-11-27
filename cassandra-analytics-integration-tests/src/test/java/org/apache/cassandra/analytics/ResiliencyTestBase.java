@@ -18,8 +18,16 @@
 
 package org.apache.cassandra.analytics;
 
+import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.management.ManagementFactory;
 import java.math.BigInteger;
+import java.nio.charset.Charset;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -27,14 +35,22 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Range;
+import org.junit.jupiter.api.BeforeAll;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import o.a.c.analytics.sidecar.shaded.testing.adapters.base.StorageJmxOperations;
@@ -47,28 +63,17 @@ import org.apache.cassandra.distributed.api.Row;
 import org.apache.cassandra.distributed.api.SimpleQueryResult;
 import org.apache.cassandra.distributed.api.TokenSupplier;
 import org.apache.cassandra.sidecar.testing.IntegrationTestBase;
-import org.apache.cassandra.spark.KryoRegister;
-import org.apache.cassandra.spark.bulkwriter.BulkSparkConf;
 import org.apache.cassandra.spark.bulkwriter.DecoratedKey;
 import org.apache.cassandra.spark.bulkwriter.Tokenizer;
 import org.apache.cassandra.spark.common.schema.ColumnType;
 import org.apache.cassandra.spark.common.schema.ColumnTypes;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
-import org.apache.spark.SparkConf;
-import org.apache.spark.sql.DataFrameWriter;
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.RowFactory;
-import org.apache.spark.sql.SQLContext;
-import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.types.StructType;
 import scala.Tuple2;
 
 import static junit.framework.TestCase.assertTrue;
 import static org.apache.cassandra.distributed.shared.NetworkTopology.dcAndRack;
 import static org.apache.cassandra.distributed.shared.NetworkTopology.networkTopology;
-import static org.apache.spark.sql.types.DataTypes.IntegerType;
-import static org.apache.spark.sql.types.DataTypes.StringType;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -76,9 +81,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public abstract class ResiliencyTestBase extends IntegrationTestBase
 {
-    private static final String createTableStmt = "create table if not exists %s (id int, course text, marks int, primary key (id));";
-    protected static final String retrieveRows = "select * from " + TEST_KEYSPACE + ".%s";
     public static final int rowCount = 1000;
+    protected static final String retrieveRows = "select * from " + TEST_KEYSPACE + ".%s";
+    private static final Logger LOGGER = LoggerFactory.getLogger(ResiliencyTestBase.class);
+    private static final String createTableStmt = "create table if not exists %s (id int, course text, marks int, primary key (id));";
+
+    private final ExecutorService executorService = Executors.newCachedThreadPool();
+    private final AtomicReference<byte[]> errorOutput = new AtomicReference<>();
+    private final AtomicReference<byte[]> outputBytes = new AtomicReference<>();
+
 
     public QualifiedTableName initializeSchema()
     {
@@ -91,31 +102,13 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         return createTestTable(createTableStmt);
     }
 
-    public SparkConf generateSparkConf()
-    {
-        SparkConf sparkConf = new SparkConf()
-                              .setAppName("Integration test Spark Cassandra Bulk Reader Job")
-                              .set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-                              .set("spark.master", "local[8,4]");
-        BulkSparkConf.setupSparkConf(sparkConf, true);
-        KryoRegister.setup(sparkConf);
-        return sparkConf;
-    }
-
-    public SparkSession generateSparkSession(SparkConf sparkConf)
-    {
-        return SparkSession.builder()
-                           .config(sparkConf)
-                           .getOrCreate();
-    }
-
     public Set<String> getDataForRange(Range<BigInteger> range)
     {
         // Iterate through all data entries; filter only entries that belong to range; convert to strings
         return generateExpectedData().stream()
-                   .filter(t -> range.contains(t._1().getToken()))
-                   .map(t -> t._2()[0] + ":" + t._2()[1] + ":" + t._2()[2])
-                   .collect(Collectors.toSet());
+                                     .filter(t -> range.contains(t._1().getToken()))
+                                     .map(t -> t._2()[0] + ":" + t._2()[1] + ":" + t._2()[2])
+                                     .collect(Collectors.toSet());
     }
 
     public List<Tuple2<DecoratedKey, Object[]>> generateExpectedData()
@@ -147,38 +140,16 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
     public Set<String> filterTokenRangeData(List<Range<BigInteger>> ranges)
     {
         return ranges.stream()
-                 .map(r -> getDataForRange(r))
-                 .flatMap(Collection::stream)
-                 .collect(Collectors.toSet());
-    }
-
-    private List<Range<BigInteger>> getRangesForInstance(IUpgradeableInstance instance, boolean isPending)
-    {
-        IInstanceConfig config = instance.config();
-        JmxClient client = JmxClient.builder()
-                                    .host(config.broadcastAddress().getAddress().getHostAddress())
-                                    .port(config.jmxPort())
-                                    .build();
-        StorageJmxOperations ss = client.proxy(StorageJmxOperations.class, "org.apache.cassandra.db:type=StorageService");
-
-        Map<List<String>, List<String>> ranges = isPending ? ss.getPendingRangeToEndpointWithPortMap(TEST_KEYSPACE)
-                                                           : ss.getRangeToEndpointWithPortMap(TEST_KEYSPACE);
-
-        // filter ranges that belong to the instance
-        return ranges.entrySet()
-                            .stream()
-                            .filter(e -> e.getValue().contains(instance.broadcastAddress().getAddress().getHostAddress()
-                                                               + ":" + instance.broadcastAddress().getPort()))
-                            .map(e -> unwrapRanges(e.getKey()))
-                            .flatMap(Collection::stream)
-                            .collect(Collectors.toList());
+                     .map(this::getDataForRange)
+                     .flatMap(Collection::stream)
+                     .collect(Collectors.toSet());
     }
 
     /**
      * Returns the expected set of rows as strings for each instance in the cluster
      */
     public Map<IUpgradeableInstance, Set<String>> generateExpectedInstanceData(UpgradeableCluster cluster,
-                                                                                List<IUpgradeableInstance> pendingNodes)
+                                                                               List<IUpgradeableInstance> pendingNodes)
     {
         List<IUpgradeableInstance> instances = cluster.stream().collect(Collectors.toList());
         Map<IUpgradeableInstance, Set<String>> expectedInstanceData = getInstanceData(instances, false);
@@ -189,42 +160,40 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
                                                              .filter(e -> !e.getValue().isEmpty())
                                                              .collect(Collectors.toMap(Map.Entry::getKey,
                                                                                        Map.Entry::getValue)));
-        return  expectedInstanceData;
+        return expectedInstanceData;
     }
 
-    private List<Range<BigInteger>> unwrapRanges(List<String> range)
-    {
-        List<Range<BigInteger>> ranges = new ArrayList<Range<BigInteger>>();
-        BigInteger start = new BigInteger(range.get(0));
-        BigInteger end = new BigInteger(range.get(1));
-        if (start.compareTo(end) > 0)
-        {
-            ranges.add(Range.openClosed(start, BigInteger.valueOf(Long.MAX_VALUE)));
-            ranges.add(Range.openClosed(BigInteger.valueOf(Long.MIN_VALUE), end));
-        }
-        else
-        {
-            ranges.add(Range.openClosed(start, end));
-        }
-        return ranges;
-    }
-
-    public Dataset<org.apache.spark.sql.Row> generateData(SparkSession spark)
-    {
-        SQLContext sql = spark.sqlContext();
-        StructType schema = new StructType()
-                            .add("id", IntegerType, false)
-                            .add("course", StringType, false)
-                            .add("marks", IntegerType, false);
-
-        List<org.apache.spark.sql.Row> rows = IntStream.range(0, rowCount)
-                                                       .mapToObj(recordNum -> {
-                                                           String course = "course" + recordNum;
-                                                           ArrayList<Object> values = new ArrayList<>(Arrays.asList(recordNum, course, recordNum));
-                                                           return RowFactory.create(values.toArray());
-                                                       }).collect(Collectors.toList());
-        return sql.createDataFrame(rows, schema);
-    }
+//    public void validateData(String tableName, ConsistencyLevel cl)
+//    {
+//        String query = String.format(retrieveRows, tableName);
+//        try
+//        {
+//            ranges.add(Range.openClosed(start, BigInteger.valueOf(Long.MAX_VALUE)));
+//            ranges.add(Range.openClosed(BigInteger.valueOf(Long.MIN_VALUE), end));
+//        }
+//        else
+//        {
+//            ranges.add(Range.openClosed(start, end));
+//        }
+//        return ranges;
+//    }
+//
+//    public Dataset<org.apache.spark.sql.Row> generateData(SparkSession spark)
+//    {
+//        SQLContext sql = spark.sqlContext();
+//        StructType schema = new StructType()
+//                            .add("id", IntegerType, false)
+//                            .add("course", StringType, false)
+//                            .add("marks", IntegerType, false);
+//
+//        List<org.apache.spark.sql.Row> rows = IntStream.range(0, rowCount)
+//                                                       .mapToObj(recordNum -> {
+//                                                           String course = "course" + recordNum;
+//                                                           ArrayList<Object> values = new ArrayList<>(Arrays.asList(recordNum, course, recordNum));
+//                                                           return RowFactory.create(values.toArray());
+//                                                       }).collect(Collectors.toList());
+//        return sql.createDataFrame(rows, schema);
+//    }
 
     public void validateData(String tableName, ConsistencyLevel cl)
     {
@@ -261,16 +230,17 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         }
     }
 
-    private org.apache.cassandra.distributed.api.ConsistencyLevel mapConsistencyLevel(ConsistencyLevel cl)
-    {
-        return org.apache.cassandra.distributed.api.ConsistencyLevel.valueOf(cl.name());
-    }
+//    private org.apache.cassandra.distributed.api.ConsistencyLevel mapConsistencyLevel(ConsistencyLevel cl)
+//    {
+//        return org.apache.cassandra.distributed.api.ConsistencyLevel.valueOf(cl.name());
+//    }
 
     public void validateNodeSpecificData(QualifiedTableName table,
                                          Map<IUpgradeableInstance, Set<String>> expectedInstanceData)
     {
         validateNodeSpecificData(table, expectedInstanceData, true);
     }
+
     public void validateNodeSpecificData(QualifiedTableName table,
                                          Map<IUpgradeableInstance, Set<String>> expectedInstanceData,
                                          boolean hasNewNodes)
@@ -297,6 +267,81 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
                 assertThat(rows).containsAll(expectedInstanceData.get(instance));
             }
         }
+    }
+
+    public void closeStream(Closeable... closeables)
+    {
+        for (Closeable closeable : closeables)
+        {
+            try
+            {
+                if (closeable != null)
+                {
+                    closeable.close();
+                }
+            }
+            catch (IOException e)
+            {
+                LOGGER.error("Error closing " + closeable.toString(), e);
+            }
+        }
+    }
+
+    @BeforeAll
+    static void sparkSetup()
+    {
+
+    }
+
+    private static String getCleanedClasspath()
+    {
+        String classpath = System.getProperty("java.class.path");
+        Pattern pattern = Pattern.compile(":?[^:]*/dtest-\\d\\.\\d+\\.\\d+\\.jar:?");
+        return pattern.matcher(classpath).replaceAll(":");
+    }
+
+    private List<Range<BigInteger>> getRangesForInstance(IUpgradeableInstance instance, boolean isPending)
+    {
+        IInstanceConfig config = instance.config();
+        JmxClient client = JmxClient.builder()
+                                    .host(config.broadcastAddress().getAddress().getHostAddress())
+                                    .port(config.jmxPort())
+                                    .build();
+        StorageJmxOperations ss = client.proxy(StorageJmxOperations.class, "org.apache.cassandra.db:type=StorageService");
+
+        Map<List<String>, List<String>> ranges = isPending ? ss.getPendingRangeToEndpointWithPortMap(TEST_KEYSPACE)
+                                                           : ss.getRangeToEndpointWithPortMap(TEST_KEYSPACE);
+
+        // filter ranges that belong to the instance
+        return ranges.entrySet()
+                     .stream()
+                     .filter(e -> e.getValue().contains(instance.broadcastAddress().getAddress().getHostAddress()
+                                                        + ":" + instance.broadcastAddress().getPort()))
+                     .map(e -> unwrapRanges(e.getKey()))
+                     .flatMap(Collection::stream)
+                     .collect(Collectors.toList());
+    }
+
+    private List<Range<BigInteger>> unwrapRanges(List<String> range)
+    {
+        List<Range<BigInteger>> ranges = new ArrayList<Range<BigInteger>>();
+        BigInteger start = new BigInteger(range.get(0));
+        BigInteger end = new BigInteger(range.get(1));
+        if (start.compareTo(end) > 0)
+        {
+            ranges.add(Range.openClosed(start, BigInteger.valueOf(Long.MAX_VALUE)));
+            ranges.add(Range.openClosed(BigInteger.valueOf(Long.MIN_VALUE), end));
+        }
+        else
+        {
+            ranges.add(Range.openClosed(start, end));
+        }
+        return ranges;
+    }
+
+    private org.apache.cassandra.distributed.api.ConsistencyLevel mapConsistencyLevel(ConsistencyLevel cl)
+    {
+        return org.apache.cassandra.distributed.api.ConsistencyLevel.valueOf(cl.name());
     }
 
     protected UpgradeableCluster getMultiDCCluster(BiConsumer<ClassLoader, Integer> initializer,
@@ -334,10 +379,11 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         });
     }
 
-    protected QualifiedTableName bulkWriteData(ConsistencyLevel writeCL) throws InterruptedException
+    protected QualifiedTableName bulkWriteData(ConsistencyLevel writeCL, String testName)
+    throws InterruptedException
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
-        List<String> sidecarInstances = generateSidecarInstances((annotation.nodesPerDc() + annotation.newNodesPerDc()) * annotation.numDcs());
+        List<String> sidecarInstances = generateSidecarInstances();
 
         ImmutableMap<String, Integer> rf;
         if (annotation.numDcs() > 1 && annotation.useCrossDcKeyspace())
@@ -351,34 +397,155 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
 
         QualifiedTableName schema = initializeSchema(rf);
         Thread.sleep(2000);
+        String logFilePath = Paths.get("../build/test-reports/" + testName).toAbsolutePath().toString();
+        String logFileName = logFilePath + "-spark.log";
 
-        SparkConf sparkConf = generateSparkConf();
-        SparkSession spark = generateSparkSession(sparkConf);
-        Dataset<org.apache.spark.sql.Row> df = generateData(spark);
+        List<String> command = new ArrayList<>();
+        command.add(System.getProperty("java.home") + File.separator + "bin" + File.separator + "java");
+        // Uncomment the line below to debug on localhost
+        // command.add("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5151");
+//        // Override any log4j settings
+//        command.add("-Dlog4j.appender.file.type=File");
+//        command.add("-Dlog4j.appender.file.File=\"" + logFileName + "\"");
+//        command.add("-Dlog4j.rootLogger=\"file,File\"");
+//        command.add("-Dlog4j.rootCategory=\"INFO,file\"");
+        // command.add("-Dlogfile.name=\"" + logFileName + "\"");
+        command.addAll(ManagementFactory.getRuntimeMXBean().getInputArguments()
+                                        .stream()
+                                        // Remove any already-existing debugger agents from the arguments
+                                        .filter(s -> shouldRetainSetting(s))
+                                        .collect(Collectors.toList()));
+        command.add("-Dspark.cassandra_analytics.request.max_connections=5");
+        // Set both max and min heap sizes because otherwise
+        command.add("-Xmx512m");
+        command.add("-Xms512m");
+        command.add("-XX:MaxDirectMemorySize=128m");
+        command.add("-cp");
+        String cleanedClasspath = getCleanedClasspath();
+        command.add(cleanedClasspath);
+        command.add(RunWriteJob.class.getName());
+        command.add(String.join(",", sidecarInstances));
+        command.add(schema.keyspace());
+        command.add(schema.tableName());
+        command.add(writeCL.name());
+        command.add(String.valueOf(server.actualPort()));
+        command.add(String.valueOf(rowCount));
+        try
+        {
+            ProcessBuilder builder = new ProcessBuilder(command);
+            LOGGER.info("Running: {}", String.join("\n", command));
+            Process process = builder.start();
+            CountDownLatch finishLatch = startReadOutputThreads(process, String.join(" ", command));
+            finishLatch.await(); // TODO: Timeout? - can call `process.destroy` if it hangs
+            int exitCode = process.waitFor();
+            if (exitCode != 0)
+            {
+                String stdout = new String(outputBytes.get());
+                String stdErr = new String(errorOutput.get());
+                LOGGER.error("Spark STDOUT:\n*****{}\n*****", stdout);
+                LOGGER.error("Spark STDERR:\n*****{}\n*****", stdErr);
+                LOGGER.error("Failed to run spark command - please see output above for more information");
+                throw new SparkJobFailedException("Failed to run spark command",
+                                                  command,
+                                                  exitCode,
+                                                  stdout,
+                                                  stdErr);
+            }
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Unable to run spark job", e);
+        }
 
-        DataFrameWriter<org.apache.spark.sql.Row> dfWriter = df.write()
-                                                               .format("org.apache.cassandra.spark.sparksql.CassandraDataSink")
-                                                               .option("bulk_writer_cl", writeCL.name())
-                                                               .option("local_dc", "datacenter1")
-                                                               .option("sidecar_instances", String.join(",", sidecarInstances))
-                                                               .option("sidecar_port", String.valueOf(server.actualPort()))
-                                                               .option("keyspace", schema.keyspace())
-                                                               .option("table", schema.tableName())
-                                                               .option("number_splits", "-1")
-                                                               .mode("append");
-
-        dfWriter.save();
         return schema;
     }
 
-    protected List<String> generateSidecarInstances(int numNodes)
+    private static boolean shouldRetainSetting(String s)
+    {
+        return !s.startsWith("-agentlib:")
+               && !s.startsWith("-Xmx")
+               && !s.startsWith("-Xms")
+               && !s.startsWith("-Djava.security.manager");
+    }
+
+    protected List<String> generateSidecarInstances()
     {
         List<String> sidecarInstances = new ArrayList<>();
-        sidecarInstances.add("localhost");
-        for (int i = 2; i <= numNodes; i++)
+        for (IUpgradeableInstance inst: sidecarTestContext.cluster())
         {
-            sidecarInstances.add("localhost" + i);
+            // For the sake of test speed, only give the Sidecar client instances that are actually
+            // up. This is similar to considering them "administratively blocked" assuming they
+            // are down for some kind of maintenance.
+            if (!inst.isShutdown())
+            {
+                sidecarInstances.add(inst.config().broadcastAddress().getHostName());
+            }
         }
         return sidecarInstances;
+    }
+
+    private CountDownLatch startReadOutputThreads(Process ps, String commandLine)
+    {
+        final CountDownLatch completeLatch = new CountDownLatch(2);
+        // we run threads that copy stderr and stdout to prevent the
+        // external process from blocking trying to write to a full buffer.
+        executorService.execute(() -> {
+            final String errorThreadName = Thread.currentThread().getName();
+            try
+            {
+                Thread.currentThread().setName("ProcessLauncher-stderr: " + commandLine);
+                final ByteArrayOutputStream bout = new ByteArrayOutputStream();
+                copyStream(ps.getErrorStream(), bout);
+                errorOutput.set(bout.toByteArray());
+            }
+            catch (IOException e)
+            {
+                errorOutput.set(("Error copying process stderr of " + commandLine + ": " + e.toString())
+                                .getBytes(Charset.defaultCharset())
+                );
+            }
+            finally
+            {
+                completeLatch.countDown();
+                Thread.currentThread().setName(errorThreadName);
+                closeStream(ps.getErrorStream());
+            }
+        });
+
+        executorService.execute(() -> {
+            final String outputThreadName = Thread.currentThread().getName();
+            try
+            {
+                Thread.currentThread().setName("ProcessLauncher-stdout: " + commandLine);
+                final ByteArrayOutputStream bout = new ByteArrayOutputStream();
+                copyStream(ps.getInputStream(), bout);
+                outputBytes.set(bout.toByteArray());
+            }
+            catch (Exception e)
+            {
+                LOGGER.error("Could not read Spark output", e);
+                outputBytes.set(null);
+            }
+            finally
+            {
+                completeLatch.countDown();
+                Thread.currentThread().setName(outputThreadName);
+                closeStream(ps.getInputStream());
+            }
+        });
+        return completeLatch;
+    }
+
+    private long copyStream(InputStream in, OutputStream out) throws IOException
+    {
+        byte[] buf = new byte[1024];
+        int len;
+        long copyLen = 0;
+        while ((len = in.read(buf)) != -1)
+        {
+            out.write(buf, 0, len);
+            copyLen += len;
+        }
+        return copyLen;
     }
 }

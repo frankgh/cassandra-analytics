@@ -21,8 +21,11 @@ package org.apache.cassandra.analytics.expansion;
 import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.util.concurrent.Uninterruptibles;
+
+import org.junit.jupiter.api.TestInfo;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import net.bytebuddy.ByteBuddy;
@@ -33,6 +36,7 @@ import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.implementation.bind.annotation.SuperCall;
 import net.bytebuddy.pool.TypePool;
+import org.apache.cassandra.analytics.TestUninterruptibles;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
 import org.apache.cassandra.utils.Shared;
@@ -40,10 +44,10 @@ import org.apache.cassandra.utils.Shared;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
-public class JoiningMultipleNodesTest extends JoiningBaseTest
+public class JoiningMultipleNodesTest extends JoiningTestBase
 {
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperMultipleJoiningNodes.reset();
@@ -53,11 +57,12 @@ public class JoiningMultipleNodesTest extends JoiningBaseTest
                                BBHelperMultipleJoiningNodes.transitioningStateEnd,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
-                               false);
+                               false,
+                               testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperMultipleJoiningNodesFailure.reset();
@@ -67,11 +72,12 @@ public class JoiningMultipleNodesTest extends JoiningBaseTest
                                BBHelperMultipleJoiningNodesFailure.transitioningStateEnd,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
-                               true);
+                               true,
+                               testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperMultipleJoiningNodes.reset();
@@ -81,11 +87,12 @@ public class JoiningMultipleNodesTest extends JoiningBaseTest
                                BBHelperMultipleJoiningNodes.transitioningStateEnd,
                                ConsistencyLevel.QUORUM,
                                ConsistencyLevel.QUORUM,
-                               false);
+                               false,
+                               testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperMultipleJoiningNodesFailure.reset();
@@ -95,7 +102,8 @@ public class JoiningMultipleNodesTest extends JoiningBaseTest
                                BBHelperMultipleJoiningNodesFailure.transitioningStateEnd,
                                ConsistencyLevel.QUORUM,
                                ConsistencyLevel.QUORUM,
-                               true);
+                               true,
+                               testInfo.getDisplayName());
     }
 
     /**
@@ -132,7 +140,7 @@ public class JoiningMultipleNodesTest extends JoiningBaseTest
             boolean result = orig.call();
             // trigger bootstrap start and wait until bootstrap is ready from test
             transitioningStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd);
+            TestUninterruptibles.awaitUninterruptiblyOrThrow(transitioningStateEnd, 2, TimeUnit.MINUTES);
             return result;
         }
 
@@ -177,7 +185,7 @@ public class JoiningMultipleNodesTest extends JoiningBaseTest
             boolean result = orig.call();
             // trigger bootstrap start and wait until bootstrap is ready from test
             transitioningStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd);
+            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd, 2, TimeUnit.MINUTES);
             throw new UnsupportedOperationException("Simulated failure");
         }
 

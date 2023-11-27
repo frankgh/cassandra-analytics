@@ -21,8 +21,11 @@ package org.apache.cassandra.analytics.replacement;
 import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.util.concurrent.Uninterruptibles;
+
+import org.junit.jupiter.api.TestInfo;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import net.bytebuddy.ByteBuddy;
@@ -33,6 +36,7 @@ import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.implementation.bind.annotation.SuperCall;
 import net.bytebuddy.pool.TypePool;
+import org.apache.cassandra.analytics.TestUninterruptibles;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
 import org.apache.cassandra.utils.Shared;
@@ -40,11 +44,11 @@ import org.apache.cassandra.utils.Shared;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
-public class HostReplacementMultiDCTest extends HostReplacementBaseTest
+public class HostReplacementMultiDCTest extends HostReplacementTestBase
 {
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementMultiDCTest(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, buildCluster = false)
+    void nodeReplacementMultiDCTest(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperNodeReplacementMultiDC.reset();
 
@@ -55,12 +59,13 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
                            BBHelperNodeReplacementMultiDC.nodeStart,
                            false,
                            ConsistencyLevel.LOCAL_QUORUM,
-                           ConsistencyLevel.LOCAL_QUORUM);
+                           ConsistencyLevel.LOCAL_QUORUM,
+                           testInfo.getDisplayName());
 
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementMultiDCEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, buildCluster = false)
+    void nodeReplacementMultiDCEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperNodeReplacementMultiDC.reset();
 
@@ -70,13 +75,14 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
                            BBHelperNodeReplacementMultiDC.transientStateEnd,
                            BBHelperNodeReplacementMultiDC.nodeStart,
                            false,
+                           ConsistencyLevel.LOCAL_QUORUM,
                            ConsistencyLevel.EACH_QUORUM,
-                           ConsistencyLevel.LOCAL_QUORUM);
+                           testInfo.getDisplayName());
 
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementMultiDCQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, buildCluster = false)
+    void nodeReplacementMultiDCQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperNodeReplacementMultiDC.reset();
 
@@ -87,12 +93,13 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
                            BBHelperNodeReplacementMultiDC.nodeStart,
                            false,
                            ConsistencyLevel.QUORUM,
-                           ConsistencyLevel.QUORUM);
+                           ConsistencyLevel.QUORUM,
+                           testInfo.getDisplayName());
 
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementMultiDCAllWriteOneRead(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, buildCluster = false)
+    void nodeReplacementMultiDCAllWriteOneRead(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperNodeReplacementMultiDC.reset();
 
@@ -102,8 +109,9 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
                            BBHelperNodeReplacementMultiDC.transientStateEnd,
                            BBHelperNodeReplacementMultiDC.nodeStart,
                            false,
+                           ConsistencyLevel.ONE,
                            ConsistencyLevel.ALL,
-                           ConsistencyLevel.ONE);
+                           testInfo.getDisplayName());
 
     }
 
@@ -111,8 +119,8 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
      * Validates successful write operation when host replacement fails. Also validates that the
      * node intended to be replaced is 'Down' and the replacement node is not 'Normal'.
      */
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementFailureMultiDC(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, network = true, buildCluster = false)
+    void nodeReplacementFailureMultiDC(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperReplacementFailureMultiDC.reset();
 
@@ -123,7 +131,8 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
                            BBHelperReplacementFailureMultiDC.nodeStart,
                            true,
                            ConsistencyLevel.LOCAL_QUORUM,
-                           ConsistencyLevel.LOCAL_QUORUM);
+                           ConsistencyLevel.LOCAL_QUORUM,
+                           testInfo.getDisplayName());
 
     }
 
@@ -133,8 +142,8 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
      * RF requirements.
      */
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void nodeReplacementFailureMultiDCInsufficientNodes(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, numDcs = 2, network = true, buildCluster = false)
+    void nodeReplacementFailureMultiDCInsufficientNodes(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperNodeReplacementMultiDCInsufficientReplicas.reset();
 
@@ -147,7 +156,8 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
                            true,
                            true,
                            ConsistencyLevel.EACH_QUORUM,
-                           ConsistencyLevel.EACH_QUORUM);
+                           ConsistencyLevel.EACH_QUORUM,
+                           testInfo.getDisplayName());
 
     }
 
@@ -189,7 +199,7 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
             nodeStart.countDown();
             // trigger bootstrap start and wait until bootstrap is ready from test
             transientStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            TestUninterruptibles.awaitUninterruptiblyOrThrow(transientStateEnd, 2, TimeUnit.MINUTES);
             return result;
         }
 
@@ -217,7 +227,7 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
         {
             // Test case involves 6 node cluster (3 per DC) with a replacement node
             // We intercept the bootstrap of the replacement (7th) node to validate token ranges
-            if (nodeNumber == 5)
+            if (nodeNumber == 7)
             {
                 TypePool typePool = TypePool.Default.of(cl);
                 TypeDescription description = typePool.describe("org.apache.cassandra.service.StorageService")
@@ -240,7 +250,7 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
             nodeStart.countDown();
             // trigger bootstrap start and wait until bootstrap is ready from test
             transientStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd, 2, TimeUnit.MINUTES);
             throw new UnsupportedOperationException("Simulated failure");
             // return result;
         }
@@ -291,7 +301,7 @@ public class HostReplacementMultiDCTest extends HostReplacementBaseTest
             nodeStart.countDown();
             // trigger bootstrap start and wait until bootstrap is ready from test
             transientStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd, 2, TimeUnit.MINUTES);
             throw new UnsupportedOperationException("Simulated failure");
             // return result;
         }

@@ -21,8 +21,11 @@ package org.apache.cassandra.analytics.expansion;
 import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.util.concurrent.Uninterruptibles;
+
+import org.junit.jupiter.api.TestInfo;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import net.bytebuddy.ByteBuddy;
@@ -33,6 +36,7 @@ import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.implementation.bind.annotation.SuperCall;
 import net.bytebuddy.pool.TypePool;
+import org.apache.cassandra.analytics.TestUninterruptibles;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
@@ -41,10 +45,10 @@ import org.apache.cassandra.utils.Shared;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
-public class JoiningMultiDCTest extends JoiningBaseTest
+public class JoiningMultiDCTest extends JoiningTestBase
 {
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void allReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void allReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperMultiDC.reset();
@@ -55,11 +59,12 @@ public class JoiningMultiDCTest extends JoiningBaseTest
                                cluster,
                                ConsistencyLevel.ALL,
                                ConsistencyLevel.ONE,
-                               false);
+                               false,
+                               testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void allReadOneWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    void allReadOneWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperMultiDCFailure.reset();
@@ -70,11 +75,12 @@ public class JoiningMultiDCTest extends JoiningBaseTest
                                cluster,
                                ConsistencyLevel.ALL,
                                ConsistencyLevel.ONE,
-                               true);
+                               true,
+                               testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void localQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void localQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperMultiDC.reset();
@@ -85,11 +91,12 @@ public class JoiningMultiDCTest extends JoiningBaseTest
                                cluster,
                                ConsistencyLevel.LOCAL_QUORUM,
                                ConsistencyLevel.LOCAL_QUORUM,
-                               false);
+                               false,
+                               testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void localQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    void localQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperMultiDCFailure.reset();
@@ -100,11 +107,12 @@ public class JoiningMultiDCTest extends JoiningBaseTest
                                cluster,
                                ConsistencyLevel.LOCAL_QUORUM,
                                ConsistencyLevel.LOCAL_QUORUM,
-                               true);
+                               true,
+                               testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void eachQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void eachQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperMultiDC.reset();
@@ -115,11 +123,12 @@ public class JoiningMultiDCTest extends JoiningBaseTest
                                cluster,
                                ConsistencyLevel.EACH_QUORUM,
                                ConsistencyLevel.LOCAL_QUORUM,
-                               false);
+                               false,
+                               testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void eachQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    void eachQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperMultiDCFailure.reset();
@@ -130,11 +139,12 @@ public class JoiningMultiDCTest extends JoiningBaseTest
                                cluster,
                                ConsistencyLevel.EACH_QUORUM,
                                ConsistencyLevel.LOCAL_QUORUM,
-                               true);
+                               true,
+                               testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperMultiDC.reset();
@@ -145,11 +155,12 @@ public class JoiningMultiDCTest extends JoiningBaseTest
                                cluster,
                                ConsistencyLevel.QUORUM,
                                ConsistencyLevel.QUORUM,
-                               false);
+                               false,
+                               testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperMultiDCFailure.reset();
@@ -160,11 +171,12 @@ public class JoiningMultiDCTest extends JoiningBaseTest
                                cluster,
                                ConsistencyLevel.QUORUM,
                                ConsistencyLevel.QUORUM,
-                               true);
+                               true,
+                               testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperMultiDC.reset();
@@ -175,11 +187,12 @@ public class JoiningMultiDCTest extends JoiningBaseTest
                                cluster,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
-                               false);
+                               false,
+                               testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperMultiDCFailure.reset();
@@ -190,7 +203,8 @@ public class JoiningMultiDCTest extends JoiningBaseTest
                                cluster,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
-                               true);
+                               true,
+                               testInfo.getDisplayName());
     }
 
     /**
@@ -227,7 +241,7 @@ public class JoiningMultiDCTest extends JoiningBaseTest
             boolean result = orig.call();
             // trigger bootstrap start and wait until bootstrap is ready from test
             transitioningStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd);
+            TestUninterruptibles.awaitUninterruptiblyOrThrow(transitioningStateEnd, 2, TimeUnit.MINUTES);
             return result;
         }
 
@@ -272,7 +286,7 @@ public class JoiningMultiDCTest extends JoiningBaseTest
             boolean result = orig.call();
             // trigger bootstrap start and wait until bootstrap is ready from test
             transitioningStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd);
+            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd, 2, TimeUnit.MINUTES);
             throw new UnsupportedOperationException("Simulated failure");
         }
 

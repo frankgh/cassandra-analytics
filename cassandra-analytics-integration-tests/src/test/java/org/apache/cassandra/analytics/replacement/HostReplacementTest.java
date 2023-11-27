@@ -21,8 +21,11 @@ package org.apache.cassandra.analytics.replacement;
 import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.util.concurrent.Uninterruptibles;
+
+import org.junit.jupiter.api.TestInfo;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import net.bytebuddy.ByteBuddy;
@@ -33,6 +36,7 @@ import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.implementation.bind.annotation.SuperCall;
 import net.bytebuddy.pool.TypePool;
+import org.apache.cassandra.analytics.TestUninterruptibles;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
 import org.apache.cassandra.utils.Shared;
@@ -40,10 +44,10 @@ import org.apache.cassandra.utils.Shared;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
-public class HostReplacementTest extends HostReplacementBaseTest
+public class HostReplacementTest extends HostReplacementTestBase
 {
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void hostReplacementQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void hostReplacementQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperReplacementsNode.reset();
         runReplacementTest(cassandraTestContext,
@@ -53,12 +57,12 @@ public class HostReplacementTest extends HostReplacementBaseTest
                            BBHelperReplacementsNode.nodeStart,
                            false,
                            ConsistencyLevel.QUORUM,
-                           ConsistencyLevel.QUORUM);
+                           ConsistencyLevel.QUORUM, testInfo.getDisplayName());
     }
 
     // Note: The following test depends on sidecar fix: https://issues.apache.org/jira/browse/CASSANDRASC-78
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void hostReplacementOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void hostReplacementOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperReplacementsNode.reset();
         runReplacementTest(cassandraTestContext,
@@ -68,11 +72,11 @@ public class HostReplacementTest extends HostReplacementBaseTest
                            BBHelperReplacementsNode.nodeStart,
                            false,
                            ConsistencyLevel.ONE,
-                           ConsistencyLevel.ALL);
+                           ConsistencyLevel.ALL, testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void hostReplacementFailureQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void hostReplacementFailureQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperReplacementsNodeFailure.reset();
         runReplacementTest(cassandraTestContext,
@@ -82,12 +86,12 @@ public class HostReplacementTest extends HostReplacementBaseTest
                            BBHelperReplacementsNodeFailure.nodeStart,
                            true,
                            ConsistencyLevel.QUORUM,
-                           ConsistencyLevel.QUORUM);
+                           ConsistencyLevel.QUORUM, testInfo.getDisplayName());
 
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
-    void hostReplacementFailureOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext) throws Exception
+    void hostReplacementFailureOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperReplacementsNodeFailure.reset();
         runReplacementTest(cassandraTestContext,
@@ -97,7 +101,7 @@ public class HostReplacementTest extends HostReplacementBaseTest
                            BBHelperReplacementsNodeFailure.nodeStart,
                            true,
                            ConsistencyLevel.ONE,
-                           ConsistencyLevel.ALL);
+                           ConsistencyLevel.ALL, testInfo.getDisplayName());
 
     }
 
@@ -139,7 +143,7 @@ public class HostReplacementTest extends HostReplacementBaseTest
             nodeStart.countDown();
             // trigger bootstrap start and wait until bootstrap is ready from test
             transitioningStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd);
+            TestUninterruptibles.awaitUninterruptiblyOrThrow(transitioningStateEnd, 2, TimeUnit.MINUTES);
             return result;
         }
 
@@ -189,7 +193,7 @@ public class HostReplacementTest extends HostReplacementBaseTest
             nodeStart.countDown();
             // trigger bootstrap start and wait until bootstrap is ready from test
             transitioningStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd);
+            Uninterruptibles.awaitUninterruptibly(transitioningStateEnd, 2, TimeUnit.MINUTES);
             throw new UnsupportedOperationException("Simulated failure");
             // return result;
         }

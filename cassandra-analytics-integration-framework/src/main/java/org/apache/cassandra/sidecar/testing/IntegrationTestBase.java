@@ -53,6 +53,7 @@ import io.vertx.core.eventbus.MessageConsumer;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.client.WebClient;
 import io.vertx.junit5.VertxTestContext;
+import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.sidecar.cluster.CassandraAdapterDelegate;
 import org.apache.cassandra.sidecar.cluster.InstancesConfig;
 import org.apache.cassandra.sidecar.cluster.instance.InstanceMetadata;
@@ -169,9 +170,11 @@ public abstract class IntegrationTestBase
 
     protected void createTestKeyspace(Map<String, Integer> rf)
     {
-        Session session = maybeGetSession();
-        session.execute("CREATE KEYSPACE " + TEST_KEYSPACE +
-                        " WITH REPLICATION = { 'class' : 'NetworkTopologyStrategy', " + generateRfString(rf) + " };");
+        String query = "CREATE KEYSPACE " + TEST_KEYSPACE +
+                       " WITH REPLICATION = { 'class' : 'NetworkTopologyStrategy', " + generateRfString(rf) + " };";
+        UpgradeableCluster cluster = sidecarTestContext.cassandraTestContext()
+                                                       .cluster();
+        cluster.schemaChange(query, true, cluster.getFirstRunningInstance());
     }
 
     private String generateRfString(Map<String, Integer> dcToRf)
@@ -182,9 +185,12 @@ public abstract class IntegrationTestBase
 
     protected QualifiedTableName createTestTable(String createTableStatement)
     {
-        Session session = maybeGetSession();
         QualifiedTableName tableName = uniqueTestTableFullName();
-        session.execute(String.format(createTableStatement, tableName));
+        UpgradeableCluster cluster = sidecarTestContext.cassandraTestContext()
+                                                       .cluster();
+        cluster.schemaChange(String.format(createTableStatement, tableName),
+                             true,
+                             cluster.getFirstRunningInstance());
         return tableName;
     }
 

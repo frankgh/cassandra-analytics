@@ -23,30 +23,37 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import com.google.common.util.concurrent.Uninterruptibles;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
+import org.apache.cassandra.analytics.TestUninterruptibles;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.IUpgradeableInstance;
+import org.apache.cassandra.distributed.api.NodeToolResult;
 import org.apache.cassandra.distributed.shared.ClusterUtils;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
-class LeavingBaseTest extends ResiliencyTestBase
+class LeavingTestBase extends ResiliencyTestBase
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(LeavingTestBase.class);
+
     void runLeavingTestScenario(int leavingNodesPerDC,
                                 CountDownLatch transitioningStateStart,
                                 CountDownLatch transitioningStateEnd,
                                 UpgradeableCluster cluster,
                                 ConsistencyLevel readCL,
                                 ConsistencyLevel writeCL,
-                                boolean isFailure) throws Exception
+                                boolean isExpectedToFail,
+                                String testName) throws Exception
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         QualifiedTableName table;
@@ -58,12 +65,11 @@ class LeavingBaseTest extends ResiliencyTestBase
             leavingNodes = decommissionNodes(cluster, leavingNodesPerDC, annotation.numDcs());
 
             // Wait until nodes have reached expected state
-            Uninterruptibles.awaitUninterruptibly(transitioningStateStart);
+            TestUninterruptibles.awaitUninterruptiblyOrThrow(transitioningStateStart, 4, TimeUnit.MINUTES);
 
             leavingNodes.forEach(instance -> ClusterUtils.awaitRingState(seed, instance, "Leaving"));
-            table = bulkWriteData(writeCL);
+            table = bulkWriteData(writeCL, testName);
 
-            List<IUpgradeableInstance> instances = cluster.stream().collect(Collectors.toList());
             expectedInstanceData = generateExpectedInstanceData(cluster, leavingNodes);
         }
         finally
@@ -79,7 +85,7 @@ class LeavingBaseTest extends ResiliencyTestBase
         validateNodeSpecificData(table, expectedInstanceData, false);
 
         // For tests that involve LEAVE failures, we validate that the leaving nodes are part of the cluster
-        if (isFailure)
+        if (isExpectedToFail)
         {
             // check leave node are part of cluster when leave fails
             assertTrue(areLeavingNodesPartOfCluster(cluster.get(1), leavingNodes));
@@ -92,7 +98,15 @@ class LeavingBaseTest extends ResiliencyTestBase
         for (int i = 0; i < leavingNodesPerDC * numDcs; i++)
         {
             IUpgradeableInstance node = cluster.get(cluster.size() - i);
-            new Thread(() -> node.nodetoolResult("decommission").asserts().success()).start();
+            new Thread(() -> {
+                NodeToolResult decommission = node.nodetoolResult("decommission");
+                if (decommission.getRc() != 0 || decommission.getError() != null)
+                {
+                    LOGGER.error("Failed to decommission instance={}",
+                                 node.config().num(), decommission.getError());
+                }
+                decommission.asserts().success();
+            }).start();
             leavingNodes.add(node);
         }
 

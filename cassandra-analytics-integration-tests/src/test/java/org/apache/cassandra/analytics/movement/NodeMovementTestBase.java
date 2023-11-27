@@ -26,12 +26,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
-import com.google.common.util.concurrent.Uninterruptibles;
-
 import com.datastax.driver.core.ConsistencyLevel;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.analytics.TestTokenSupplier;
+import org.apache.cassandra.analytics.TestUninterruptibles;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.IUpgradeableInstance;
 import org.apache.cassandra.distributed.api.TokenSupplier;
@@ -41,7 +40,7 @@ import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class NodeMovementBaseTest extends ResiliencyTestBase
+public class NodeMovementTestBase extends ResiliencyTestBase
 {
     public static final int SINGLE_DC_MOVING_NODE_IDX = 5;
     public static final int MULTI_DC_MOVING_NODE_IDX = 3;
@@ -53,7 +52,7 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
                            CountDownLatch transitioningStateEnd,
                            boolean isFailure,
                            ConsistencyLevel readCL,
-                           ConsistencyLevel writeCL) throws Exception
+                           ConsistencyLevel writeCL, String testName) throws Exception
 
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
@@ -91,9 +90,9 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
                                        .success()).start();
 
             // Wait until nodes have reached expected state
-            Uninterruptibles.awaitUninterruptibly(transitioningStateStart, 2, TimeUnit.MINUTES);
+            TestUninterruptibles.awaitUninterruptiblyOrThrow(transitioningStateStart, 2, TimeUnit.MINUTES);
             ClusterUtils.awaitRingState(seed, movingNode, "Moving");
-            schema = bulkWriteData(writeCL);
+            schema = bulkWriteData(writeCL, testName);
             expectedInstanceData = generateExpectedInstanceData(cluster, Collections.singletonList(movingNode));
         }
         finally

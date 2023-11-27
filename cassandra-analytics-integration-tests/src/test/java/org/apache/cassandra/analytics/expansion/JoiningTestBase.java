@@ -27,12 +27,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
-import com.google.common.util.concurrent.Uninterruptibles;
-
 import com.datastax.driver.core.ConsistencyLevel;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.analytics.TestTokenSupplier;
+import org.apache.cassandra.analytics.TestUninterruptibles;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.Feature;
 import org.apache.cassandra.distributed.api.IUpgradeableInstance;
@@ -41,10 +40,9 @@ import org.apache.cassandra.distributed.shared.ClusterUtils;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
 
-import static junit.framework.TestCase.assertNotNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class JoiningBaseTest extends ResiliencyTestBase
+public class JoiningTestBase extends ResiliencyTestBase
 {
 
     void runJoiningTestScenario(CountDownLatch transitioningStateStart,
@@ -52,7 +50,8 @@ public class JoiningBaseTest extends ResiliencyTestBase
                                 UpgradeableCluster cluster,
                                 ConsistencyLevel readCL,
                                 ConsistencyLevel writeCL,
-                                boolean isFailure) throws Exception
+                                boolean isFailure,
+                                String testName) throws Exception
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         QualifiedTableName table;
@@ -62,10 +61,10 @@ public class JoiningBaseTest extends ResiliencyTestBase
         {
             newInstances = addNewInstances(cluster, annotation.newNodesPerDc(), annotation.numDcs());
 
-            Uninterruptibles.awaitUninterruptibly(transitioningStateStart, 2, TimeUnit.MINUTES);
+            TestUninterruptibles.awaitUninterruptiblyOrThrow(transitioningStateStart, 2, TimeUnit.MINUTES);
 
             newInstances.forEach(instance -> ClusterUtils.awaitRingState(instance, instance, "Joining"));
-            table = bulkWriteData(writeCL);
+            table = bulkWriteData(writeCL, testName);
 
             expectedInstanceData = generateExpectedInstanceData(cluster, newInstances);
         }
@@ -77,7 +76,7 @@ public class JoiningBaseTest extends ResiliencyTestBase
             }
         }
 
-        assertNotNull(table);
+        assertThat(table).isNotNull();
 
         validateData(table.tableName(), readCL);
         validateNodeSpecificData(table, expectedInstanceData);
@@ -128,7 +127,8 @@ public class JoiningBaseTest extends ResiliencyTestBase
                                 CountDownLatch transitioningStateEnd,
                                 ConsistencyLevel readCL,
                                 ConsistencyLevel writeCL,
-                                boolean isFailure)
+                                boolean isFailure,
+                                String testName)
     throws Exception
     {
 
@@ -148,7 +148,8 @@ public class JoiningBaseTest extends ResiliencyTestBase
                                cluster,
                                readCL,
                                writeCL,
-                               isFailure);
+                               isFailure,
+                               testName);
     }
 
     private Optional<ClusterUtils.RingInstanceDetails> getMatchingInstanceFromRing(IUpgradeableInstance seed,

@@ -379,7 +379,7 @@ public class CassandraClusterInfo implements ClusterInfo, Closeable
     {
         Map<String, Set<String>> writeReplicasByDC;
         Map<String, Set<String>> pendingReplicasByDC;
-        List<ReplicaMetadata> replicaMetadata;
+        Map<String, ReplicaMetadata> replicaMetadata;
         Set<RingInstance> blockedInstances;
         Set<RingInstance> replacementInstances;
         Multimap<RingInstance, Range<BigInteger>> tokenRangesByInstance;
@@ -393,12 +393,15 @@ public class CassandraClusterInfo implements ClusterInfo, Closeable
                         tokenRangesByInstance.size());
 
             replacementInstances = response.replicaMetadata()
+                                           .values()
                                            .stream()
                                            .filter(m -> m.state().equalsIgnoreCase(InstanceState.REPLACING.toString()))
                                            .map(RingInstance::new)
                                            .collect(Collectors.toSet());
 
-            blockedInstances = response.replicaMetadata().stream()
+            blockedInstances = response.replicaMetadata()
+                                       .values()
+                                       .stream()
                                        .map(RingInstance::new)
                                        .filter(this::instanceIsBlocked)
                                        .collect(Collectors.toSet());
@@ -435,7 +438,7 @@ public class CassandraClusterInfo implements ClusterInfo, Closeable
                                        writeReplicasByDC,
                                        pendingReplicasByDC,
                                        tokenRangesByInstance,
-                                       replicaMetadata,
+                                       new ArrayList<>(replicaMetadata.values()),
                                        blockedInstances,
                                        replacementInstances);
     }
@@ -462,7 +465,7 @@ public class CassandraClusterInfo implements ClusterInfo, Closeable
     }
 
     private Multimap<RingInstance, Range<BigInteger>> getTokenRangesByInstance(List<ReplicaInfo> writeReplicas,
-                                                                               List<ReplicaMetadata> replicaMetadata)
+                                                                               Map<String, ReplicaMetadata> replicaMetadata)
     {
         Multimap<RingInstance, Range<BigInteger>> instanceToRangeMap = ArrayListMultimap.create();
         for (ReplicaInfo rInfo : writeReplicas)
@@ -473,12 +476,7 @@ public class CassandraClusterInfo implements ClusterInfo, Closeable
                 // For each writeReplica, get metadata and update map to include range
                 dcReplicaEntry.getValue().forEach(ipAddress -> {
                     // Get metadata for this IP; Create RingInstance
-                    // TODO: Temporary change to extract IP from 'ip:port' string. THis will go oway once
-                    // corresponding change in sidecar is merged.
-                    ReplicaMetadata replica = replicaMetadata.stream()
-                                                             .filter(r ->
-                                                                     r.address().equals(ipAddress.split(":")[0]))
-                                                             .findFirst().get();
+                    ReplicaMetadata replica = replicaMetadata.get(ipAddress);
                     instanceToRangeMap.put(new RingInstance(replica), range);
                 });
             }
@@ -494,8 +492,8 @@ public class CassandraClusterInfo implements ClusterInfo, Closeable
     protected List<NodeSettings> getAllNodeSettings()
     {
         List<NodeSettings> allNodeSettings = FutureUtils.bestEffortGet(allNodeSettingFutures,
-                                                                       conf.getSidecarRequestMaxRetryDelayInSeconds(),
-                                                                       TimeUnit.SECONDS);
+                                                                       conf.getSidecarRequestMaxRetryDelayMillis(),
+                                                                       TimeUnit.MILLISECONDS);
 
         if (allNodeSettings.isEmpty())
         {

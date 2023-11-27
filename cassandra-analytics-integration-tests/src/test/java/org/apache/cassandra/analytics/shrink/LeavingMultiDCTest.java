@@ -20,8 +20,11 @@ package org.apache.cassandra.analytics.shrink;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import com.google.common.util.concurrent.Uninterruptibles;
+
+import org.junit.jupiter.api.TestInfo;
 
 import com.datastax.driver.core.ConsistencyLevel;
 import net.bytebuddy.ByteBuddy;
@@ -32,6 +35,7 @@ import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.implementation.bind.annotation.SuperCall;
 import net.bytebuddy.pool.TypePool;
+import org.apache.cassandra.analytics.TestUninterruptibles;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
@@ -39,10 +43,10 @@ import org.apache.cassandra.utils.Shared;
 
 import static net.bytebuddy.matcher.ElementMatchers.named;
 
-class LeavingMultiDCTest extends LeavingBaseTest
+class LeavingMultiDCTest extends LeavingTestBase
 {
     @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void allReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void allReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperLeavingNodesMultiDC.reset();
@@ -55,11 +59,11 @@ class LeavingMultiDCTest extends LeavingBaseTest
                                cluster,
                                ConsistencyLevel.ALL,
                                ConsistencyLevel.ONE,
-                               false);
+                               false, testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void allReadOneWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    void allReadOneWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperLeavingNodesMultiDCFailure.reset();
@@ -72,11 +76,11 @@ class LeavingMultiDCTest extends LeavingBaseTest
                                cluster,
                                ConsistencyLevel.ALL,
                                ConsistencyLevel.ONE,
-                               true);
+                               true, testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void localQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void localQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperLeavingNodesMultiDC.reset();
@@ -89,11 +93,12 @@ class LeavingMultiDCTest extends LeavingBaseTest
                                cluster,
                                ConsistencyLevel.LOCAL_QUORUM,
                                ConsistencyLevel.LOCAL_QUORUM,
-                               false);
+                               false,
+                               testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void localQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    void localQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperLeavingNodesMultiDCFailure.reset();
@@ -106,11 +111,11 @@ class LeavingMultiDCTest extends LeavingBaseTest
                                cluster,
                                ConsistencyLevel.LOCAL_QUORUM,
                                ConsistencyLevel.LOCAL_QUORUM,
-                               true);
+                               true, testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void localQuorumReadEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void localQuorumReadEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperLeavingNodesMultiDC.reset();
@@ -123,11 +128,11 @@ class LeavingMultiDCTest extends LeavingBaseTest
                                cluster,
                                ConsistencyLevel.LOCAL_QUORUM,
                                ConsistencyLevel.EACH_QUORUM,
-                               false);
+                               false, testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void localQuorumReadEachQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    void localQuorumReadEachQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperLeavingNodesMultiDCFailure.reset();
@@ -140,11 +145,11 @@ class LeavingMultiDCTest extends LeavingBaseTest
                                cluster,
                                ConsistencyLevel.LOCAL_QUORUM,
                                ConsistencyLevel.EACH_QUORUM,
-                               true);
+                               true, testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperLeavingNodesMultiDC.reset();
@@ -157,11 +162,11 @@ class LeavingMultiDCTest extends LeavingBaseTest
                                cluster,
                                ConsistencyLevel.QUORUM,
                                ConsistencyLevel.QUORUM,
-                               false);
+                               false, testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperLeavingNodesMultiDCFailure.reset();
@@ -174,11 +179,11 @@ class LeavingMultiDCTest extends LeavingBaseTest
                                cluster,
                                ConsistencyLevel.QUORUM,
                                ConsistencyLevel.QUORUM,
-                               true);
+                               true, testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext)
+    void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperLeavingNodesMultiDC.reset();
@@ -191,11 +196,11 @@ class LeavingMultiDCTest extends LeavingBaseTest
                                cluster,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
-                               false);
+                               false, testInfo.getDisplayName());
     }
 
     @CassandraIntegrationTest(nodesPerDc = 5, numDcs = 2, network = true, gossip = true, buildCluster = false)
-    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext)
+    void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
         BBHelperLeavingNodesMultiDCFailure.reset();
@@ -208,7 +213,7 @@ class LeavingMultiDCTest extends LeavingBaseTest
                                cluster,
                                ConsistencyLevel.ONE,
                                ConsistencyLevel.ALL,
-                               true);
+                               true, testInfo.getDisplayName());
     }
 
     /**
@@ -242,7 +247,7 @@ class LeavingMultiDCTest extends LeavingBaseTest
         public static void unbootstrap(@SuperCall Callable<?> orig) throws Exception
         {
             transientStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            TestUninterruptibles.awaitUninterruptiblyOrThrow(transientStateEnd, 2, TimeUnit.MINUTES);
             orig.call();
         }
 
@@ -284,7 +289,7 @@ class LeavingMultiDCTest extends LeavingBaseTest
         public static void unbootstrap(@SuperCall Callable<?> orig) throws Exception
         {
             transientStateStart.countDown();
-            Uninterruptibles.awaitUninterruptibly(transientStateEnd);
+            Uninterruptibles.awaitUninterruptibly(transientStateEnd, 2, TimeUnit.MINUTES);
             throw new UnsupportedOperationException("Simulate leave failure");
         }
 

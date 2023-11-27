@@ -36,6 +36,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.datastax.driver.core.ConsistencyLevel;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
+import org.apache.cassandra.analytics.SparkJobFailedException;
 import org.apache.cassandra.analytics.TestTokenSupplier;
 import org.apache.cassandra.config.CassandraRelevantProperties;
 import org.apache.cassandra.distributed.UpgradeableCluster;
@@ -51,10 +52,12 @@ import org.apache.cassandra.distributed.shared.NetworkTopology;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
 
+import static org.apache.cassandra.testing.CassandraTestTemplate.fixDistributedSchemas;
+import static org.apache.cassandra.testing.CassandraTestTemplate.waitForHealthyRing;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-public class HostReplacementBaseTest extends ResiliencyTestBase
+public class HostReplacementTestBase extends ResiliencyTestBase
 {
 
     // CHECKSTYLE IGNORE: Method with many parameters
@@ -65,7 +68,8 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                             CountDownLatch nodeStart,
                             boolean isFailure,
                             ConsistencyLevel readCL,
-                            ConsistencyLevel writeCL) throws Exception
+                            ConsistencyLevel writeCL,
+                            String testName) throws Exception
     {
         runReplacementTest(cassandraTestContext,
                            instanceInitializer,
@@ -76,7 +80,8 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                            isFailure,
                            false,
                            readCL,
-                           writeCL);
+                           writeCL,
+                           testName);
     }
 
     // CHECKSTYLE IGNORE: Method with many parameters
@@ -89,7 +94,8 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                             boolean isFailure,
                             boolean shouldWriteFail,
                             ConsistencyLevel readCL,
-                            ConsistencyLevel writeCL) throws Exception
+                            ConsistencyLevel writeCL,
+                            String testName) throws Exception
     {
         CassandraIntegrationTest annotation = sidecarTestContext.cassandraTestContext().annotation;
         TokenSupplier tokenSupplier = TestTokenSupplier.evenlyDistributedTokens(annotation.nodesPerDc(),
@@ -101,6 +107,9 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
             builder.withTokenSupplier(tokenSupplier);
             builder.withDynamicPortAllocation(false);
         });
+
+        waitForHealthyRing(cluster);
+        fixDistributedSchemas(cluster);
 
         assertThat(additionalNodesToStop).isLessThan(cluster.size() - 1);
 
@@ -131,11 +140,13 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
             {
                 additionalRemovalNodes.add(cluster.get(cluster.size() - i));
             }
-            stopNodes(seed, additionalRemovalNodes);
             newNodes = startReplacementNodes(nodeStart, cluster, nodesToRemove);
+            stopNodes(seed, additionalRemovalNodes);
 
             // Wait until replacement nodes are in JOINING state
-            Uninterruptibles.awaitUninterruptibly(transitioningStateStart, 2, TimeUnit.MINUTES);
+            // NOTE: While many of these tests wait 2 minutes and pass, this particular transition
+            // takes longer, so upping the timeout to 5 minutes
+//            TestUninterruptibles.awaitUninterruptiblyOrThrow(transitioningStateStart, 10, TimeUnit.MINUTES);
 
             // Verify state of replacement nodes
             for (IUpgradeableInstance newInstance : newNodes)
@@ -153,12 +164,14 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
             // It is only in the event we have insufficient nodes, we expect write job to fail
             if (shouldWriteFail)
             {
-                assertThrows(RuntimeException.class, () -> bulkWriteData(writeCL));
+                SparkJobFailedException e = assertThrows(SparkJobFailedException.class, () -> bulkWriteData(writeCL, testName));
+                assertThat(e.getStdErr()).containsPattern("Failed to load (\\d+) ranges with EACH_QUORUM for " +
+                                                          "job ([a-zA-Z0-9-]+) in phase Environment Validation.");
                 return;
             }
             else
             {
-                schema = bulkWriteData(writeCL);
+                schema = bulkWriteData(writeCL, testName);
             }
 
             expectedInstanceData = getInstanceData(newNodes, true);
@@ -238,19 +251,22 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
             String remAddress = removedConfig.broadcastAddress().getAddress().getHostAddress();
             int remPort = removedConfig.getInt("storage_port");
             IUpgradeableInstance replacement =
-            addInstanceLocal(cluster, removedConfig.localDatacenter(), removedConfig.localRack(),
-                                     c -> {
-                                         c.set("auto_bootstrap", true);
-                                         // explicitly DOES NOT set instances that failed startup as "shutdown"
-                                         // so subsequent attempts to shut down the instance are honored
-                                         c.set("dtest.api.startup.failure_as_shutdown", false);
-                                         c.with(Feature.GOSSIP,
-                                                Feature.JMX,
-                                                Feature.NATIVE_PROTOCOL);
-                                     },
+            addInstanceLocal(cluster,
+                             removedConfig.localDatacenter(),
+                             removedConfig.localRack(),
+                             c -> {
+                                 c.set("auto_bootstrap", true);
+                                 // explicitly DOES NOT set instances that failed startup as "shutdown"
+                                 // so subsequent attempts to shut down the instance are honored
+                                 c.set("dtest.api.startup.failure_as_shutdown", false);
+                                 c.with(Feature.GOSSIP,
+                                        Feature.JMX,
+                                        Feature.NATIVE_PROTOCOL);
+                             },
                              remPort);
 
             new Thread(() -> ClusterUtils.start(replacement, (properties) -> {
+                replacement.config().set("storage_port", remPort);
                 properties.set(CassandraRelevantProperties.BOOTSTRAP_SKIP_SCHEMA_CHECK, true);
                 properties.set(CassandraRelevantProperties.BOOTSTRAP_SCHEMA_DELAY_MS,
                                TimeUnit.SECONDS.toMillis(10L));
@@ -260,6 +276,7 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                                 Long.toString(TimeUnit.SECONDS.toMillis(10L)));
                 // This property tells cassandra that this new instance is replacing the node with
                 // address remAddress and port remPort
+                int localPort = replacement.config().getInt("storage_port");
                 properties.with("cassandra.replace_address_first_boot", remAddress + ":" + remPort);
             })).start();
 
@@ -292,5 +309,19 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                            .stream()
                            .filter(i -> i.getAddress().equals(ipAddress))
                            .findFirst();
+    }
+
+    public static <I extends IInstance> I addInstance(AbstractCluster<I> cluster,
+                                                      String dc,
+                                                      String rack,
+                                                      Consumer<IInstanceConfig> fn, int remPort)
+    {
+        Objects.requireNonNull(dc, "dc");
+        Objects.requireNonNull(rack, "rack");
+        InstanceConfig config = cluster.newInstanceConfig();
+        config.set("storage_port", remPort);
+        config.networkTopology().put(config.broadcastAddress(), NetworkTopology.dcAndRack(dc, rack));
+        fn.accept(config);
+        return cluster.bootstrap(config);
     }
 }

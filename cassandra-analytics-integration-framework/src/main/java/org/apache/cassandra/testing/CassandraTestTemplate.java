@@ -40,7 +40,9 @@ import org.slf4j.LoggerFactory;
 import com.vdurmont.semver4j.Semver;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.Feature;
+import org.apache.cassandra.distributed.api.IUpgradeableInstance;
 import org.apache.cassandra.distributed.api.TokenSupplier;
+import org.apache.cassandra.distributed.shared.ClusterUtils;
 import org.apache.cassandra.distributed.shared.Versions;
 
 
@@ -76,6 +78,14 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
                                             .map(v -> invocationContext(v, context));
         }
         return Stream.of(invocationContext(new TestVersionSupplier().testVersions().findFirst().get(), context));
+    }
+
+    public static void waitForHealthyRing(UpgradeableCluster cluster)
+    {
+        for (IUpgradeableInstance inst: cluster)
+        {
+            ClusterUtils.awaitRingHealthy(inst);
+        }
     }
 
     /**
@@ -177,6 +187,11 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
                     if (annotation.startCluster())
                     {
                         cluster.startup();
+                        if (cluster.size() > 1)
+                        {
+                            waitForHealthyRing(cluster);
+                            fixDistributedSchemas(cluster);
+                        }
                     }
                     cassandraTestContext = new CassandraTestContext(versionParsed, cluster, annotation);
                 }
@@ -220,6 +235,9 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
             if (annotation.nativeTransport())
             {
                 configuredFeatures.add(Feature.NATIVE_PROTOCOL);
+                // The driver depends on gossip being enabled to work correctly
+                // so any time we enable NATIVE_PROTOCOL we should also enable GOSSIP
+                configuredFeatures.add(Feature.GOSSIP);
             }
             if (annotation.jmx())
             {
@@ -302,6 +320,23 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
         }
     }
 
+    public static void fixDistributedSchemas(UpgradeableCluster cluster)
+    {
+        // These keyspaces are under replicated by default, so must be updated when doing a multi-node cluster;
+        // else bootstrap will fail with 'Unable to find sufficient sources for streaming range <range> in keyspace <name>'
+        for (String ks : Arrays.asList("system_auth", "system_traces"))
+        {
+            cluster.schemaChange("ALTER KEYSPACE " + ks +
+                                 " WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': "
+                                 + Math.min(cluster.size(), 3) + "}",
+                                 true,
+                                 cluster.getFirstRunningInstance());
+        }
+
+        // in real live repair is needed in this case, but in the test case it doesn't matter if the tables loose
+        // anything, so ignoring repair to speed up the tests.
+    }
+
     static
     {
         // Settings to reduce the test setup delay incurred if gossip is enabled
@@ -319,6 +354,14 @@ public class CassandraTestTemplate implements TestTemplateInvocationContextProvi
         System.setProperty("cassandra.gossip_settle_poll_success_required", "6"); // Default 3
         // Disable direct memory allocator as it doesn't release properly
         System.setProperty("cassandra.netty_use_heap_allocator", "true");
-
+        // NOTE: This setting is named opposite of what it does
+        // Disable requiring native file hints, which allows some native functions to fail and the test to continue.
+        System.setProperty("cassandra.require_native_file_hints", "true");
+        // Disable all native stuff in Netty as streaming isn't functional with native enabled
+        System.setProperty("shaded.io.netty.transport.noNative", "true");
+        // Lifted from the Simulation runner (we're running into similar errors):
+        // this property is used to allow non-members of the ring to exist in gossip without breaking RF changes
+        // it would be nice not to rely on this, but hopefully we'll have consistent range movements before it matters
+        System.setProperty("cassandra.allow_alter_rf_during_range_movement", "true");
     }
 }

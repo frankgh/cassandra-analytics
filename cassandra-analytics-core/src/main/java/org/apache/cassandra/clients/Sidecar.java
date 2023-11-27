@@ -141,11 +141,12 @@ public final class Sidecar
         StartupValidator.instance().register(new KeyStoreValidation(conf));
         StartupValidator.instance().register(new TrustStoreValidation(conf));
 
-        SidecarClientConfig sidecarConfig = SidecarClientConfigImpl.builder()
-                                                                   .maxRetries(5)
-                                                                   .retryDelayMillis(200)
-                                                                   .maxRetryDelayMillis(500)
-                                                                   .build();
+        SidecarClientConfig sidecarConfig =
+        SidecarClientConfigImpl.builder()
+                               .maxRetries(conf.getSidecarRequestRetries())
+                               .retryDelayMillis(conf.getSidecarRequestRetryDelayMillis())
+                               .maxRetryDelayMillis(conf.getSidecarRequestMaxRetryDelayMillis())
+                               .build();
 
         return buildClient(sidecarConfig, vertx, httpClientConfig, sidecarInstancesProvider);
     }

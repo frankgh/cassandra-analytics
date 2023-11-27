@@ -75,11 +75,12 @@ public @interface CassandraIntegrationTest
     int numDataDirsPerInstance() default 1;
 
     /**
-     * Returns whether gossip is enabled or disabled for the integration test. Defaults to {@code false}.
+     * Returns whether gossip is enabled or disabled for the integration test. Defaults to {@code true}.
+     * NOTE: When {@code nativeTransport} is enabled, gossip will be automatically enabled as well.
      *
      * @return whether gossip is enabled or disabled for the integration test
      */
-    boolean gossip() default false;
+    boolean gossip() default true;
 
     /**
      * Returns whether internode networking is enabled or disabled for the integration test. Defaults to {@code false}.

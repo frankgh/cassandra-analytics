@@ -25,7 +25,7 @@ import org.apache.cassandra.testing.CassandraIntegrationTest;
 
 public class SparkBulkWriterSimpleTest extends IntegrationTestBase
 {
-    @CassandraIntegrationTest(nodesPerDc = 3)
+    @CassandraIntegrationTest(nodesPerDc = 3, gossip = true)
     public void runSampleJob() throws InterruptedException
     {
         UpgradeableCluster cluster = sidecarTestContext.cluster();
@@ -34,12 +34,16 @@ public class SparkBulkWriterSimpleTest extends IntegrationTestBase
         cluster.schemaChange(
         "  CREATE KEYSPACE " + keyspace + " WITH replication = "
         + "{'class': 'NetworkTopologyStrategy', 'datacenter1': '3'}\n"
-        + "      AND durable_writes = true;");
+        + "      AND durable_writes = true;",
+        true,
+        cluster.getFirstRunningInstance());
         cluster.schemaChange("CREATE TABLE " + keyspace + "." + table + " (\n"
                              + "          id BIGINT PRIMARY KEY,\n"
                              + "          course BLOB,\n"
                              + "          marks BIGINT\n"
-                             + "     );");
+                             + "     );",
+                             true,
+                             cluster.getFirstRunningInstance());
         waitForKeyspaceAndTable(keyspace, table);
         IntegrationTestJob.main(new String[]{String.valueOf(server.actualPort())});
     }

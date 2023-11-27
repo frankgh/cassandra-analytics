@@ -43,8 +43,12 @@ public interface ConsistencyLevel
      *   This is to ensure that we are writing to sufficient non-replacement nodes as replacements can potentially fail leaving us with fewer nodes.
      * </pre>
      *
-     * TODO javadocs
-     * @param localDC           the local datacenter used for consistency level, or {@code null} if not provided
+     * @param writeReplicas        the set of replicas for write operations
+     * @param pendingReplicas      the set of replicas pending status
+     * @param replacementInstances the instances being replaced
+     * @param blockedInstances     the set of instances that have been blocked for the bulk operation
+     * @param failedInstanceIps    the set of instances where there were failures
+     * @param localDC              the local datacenter used for consistency level, or {@code null} if not provided
      * @return {@code true} if the consistency has been met, {@code false} otherwise
      */
     boolean checkConsistency(Set<String> writeReplicas,

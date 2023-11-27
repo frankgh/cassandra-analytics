@@ -219,6 +219,8 @@ subprojects {
   }
 
   test {
+    def heapDumpPath = "${project.rootProject.rootDir}/build/${project.name}/heapDumps"
+    Files.createDirectories(Paths.get(heapDumpPath))
     if (JavaVersion.current().isJava11Compatible()) {
       def JDK11_OPTIONS = ['-Djdk.attach.allowAttachSelf=true',
                            '--add-exports', 'java.base/jdk.internal.misc=ALL-UNNAMED',
@@ -235,7 +237,9 @@ subprojects {
                            '--add-opens', 'java.base/jdk.internal.math=ALL-UNNAMED',
                            '--add-opens', 'java.base/jdk.internal.module=ALL-UNNAMED',
                            '--add-opens', 'java.base/jdk.internal.util.jar=ALL-UNNAMED',
-                           '--add-opens', 'jdk.management/com.sun.management.internal=ALL-UNNAMED']
+                           '--add-opens', 'jdk.management/com.sun.management.internal=ALL-UNNAMED',
+                           '-XX:+HeapDumpOnOutOfMemoryError',
+                           "-XX:HeapDumpPath=${heapDumpPath}"]
       jvmArgs(JDK11_OPTIONS)
       println("JVM arguments for $project.name are $allJvmArgs")
     }

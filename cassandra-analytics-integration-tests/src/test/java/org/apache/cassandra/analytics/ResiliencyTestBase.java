@@ -163,38 +163,6 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         return expectedInstanceData;
     }
 
-//    public void validateData(String tableName, ConsistencyLevel cl)
-//    {
-//        String query = String.format(retrieveRows, tableName);
-//        try
-//        {
-//            ranges.add(Range.openClosed(start, BigInteger.valueOf(Long.MAX_VALUE)));
-//            ranges.add(Range.openClosed(BigInteger.valueOf(Long.MIN_VALUE), end));
-//        }
-//        else
-//        {
-//            ranges.add(Range.openClosed(start, end));
-//        }
-//        return ranges;
-//    }
-//
-//    public Dataset<org.apache.spark.sql.Row> generateData(SparkSession spark)
-//    {
-//        SQLContext sql = spark.sqlContext();
-//        StructType schema = new StructType()
-//                            .add("id", IntegerType, false)
-//                            .add("course", StringType, false)
-//                            .add("marks", IntegerType, false);
-//
-//        List<org.apache.spark.sql.Row> rows = IntStream.range(0, rowCount)
-//                                                       .mapToObj(recordNum -> {
-//                                                           String course = "course" + recordNum;
-//                                                           ArrayList<Object> values = new ArrayList<>(Arrays.asList(recordNum, course, recordNum));
-//                                                           return RowFactory.create(values.toArray());
-//                                                       }).collect(Collectors.toList());
-//        return sql.createDataFrame(rows, schema);
-//    }
-
     public void validateData(String tableName, ConsistencyLevel cl)
     {
         String query = String.format(retrieveRows, tableName);
@@ -229,11 +197,6 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
             throw ex;
         }
     }
-
-//    private org.apache.cassandra.distributed.api.ConsistencyLevel mapConsistencyLevel(ConsistencyLevel cl)
-//    {
-//        return org.apache.cassandra.distributed.api.ConsistencyLevel.valueOf(cl.name());
-//    }
 
     public void validateNodeSpecificData(QualifiedTableName table,
                                          Map<IUpgradeableInstance, Set<String>> expectedInstanceData)
@@ -398,7 +361,7 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         QualifiedTableName schema = initializeSchema(rf);
         Thread.sleep(2000);
         String logFilePath = Paths.get("../build/test-reports/" + testName).toAbsolutePath().toString();
-        String logFileName = logFilePath + "-spark.log";
+//        String logFileName = logFilePath + "-spark.log";
 
         List<String> command = new ArrayList<>();
         command.add(System.getProperty("java.home") + File.separator + "bin" + File.separator + "java");
@@ -536,16 +499,13 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         return completeLatch;
     }
 
-    private long copyStream(InputStream in, OutputStream out) throws IOException
+    private void copyStream(InputStream in, OutputStream out) throws IOException
     {
-        byte[] buf = new byte[1024];
         int len;
-        long copyLen = 0;
+        byte[] buf = new byte[1024];
         while ((len = in.read(buf)) != -1)
         {
             out.write(buf, 0, len);
-            copyLen += len;
         }
-        return copyLen;
     }
 }

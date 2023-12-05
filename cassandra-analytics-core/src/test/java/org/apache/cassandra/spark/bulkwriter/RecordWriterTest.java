@@ -51,6 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 
@@ -108,7 +109,26 @@ public class RecordWriterTest
     }
 
     @Test
-    public void testSuccessfulWrite()
+    public void testWriteWithExclusions()
+    {
+        TokenRangeMapping<RingInstance> testMapping =
+        TokenRangeMappingUtils.buildTokenRangeMappingWithFailures(100000,
+                                                      ImmutableMap.of("DC1", 3),
+                                                      12);
+
+        MockBulkWriterContext m = Mockito.spy(writerContext);
+        rw = new RecordWriter(m, COLUMN_NAMES, () -> tc, SSTableWriter::new);
+
+        when(m.getTokenRangeMapping(anyBoolean())).thenReturn(testMapping);
+        when(m.getInstanceAvailability()).thenCallRealMethod();
+        Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, true);
+        rw.write(data);
+        Map<CassandraInstance, List<UploadRequest>> uploads = writerContext.getUploads();
+        assertThat(uploads.keySet().size(), is(REPLICA_COUNT));  // Should upload to 3 replicas
+    }
+
+    @Test
+    public void testSuccessfulWrite() throws InterruptedException
     {
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, true);
         validateSuccessfulWrite(writerContext, data, COLUMN_NAMES);
@@ -131,7 +151,7 @@ public class RecordWriterTest
     }
 
     @Test
-    public void testWriteWithConstantTTL()
+    public void testWriteWithConstantTTL() throws InterruptedException
     {
         MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(tokenRangeMapping);
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, true, false, false);
@@ -139,7 +159,7 @@ public class RecordWriterTest
     }
 
     @Test
-    public void testWriteWithTTLColumn()
+    public void testWriteWithTTLColumn() throws InterruptedException
     {
         MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(tokenRangeMapping);
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, true, true, false);
@@ -151,7 +171,7 @@ public class RecordWriterTest
     }
 
     @Test
-    public void testWriteWithConstantTimestamp()
+    public void testWriteWithConstantTimestamp() throws InterruptedException
     {
         MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(tokenRangeMapping);
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, true, false, false);
@@ -159,7 +179,7 @@ public class RecordWriterTest
     }
 
     @Test
-    public void testWriteWithTimestampColumn()
+    public void testWriteWithTimestampColumn() throws InterruptedException
     {
         MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(tokenRangeMapping);
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, true, false, true);
@@ -171,7 +191,7 @@ public class RecordWriterTest
     }
 
     @Test
-    public void testWriteWithTimestampAndTTLColumn()
+    public void testWriteWithTimestampAndTTLColumn() throws InterruptedException
     {
         MockBulkWriterContext bulkWriterContext = new MockBulkWriterContext(tokenRangeMapping);
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(5, true, true, true);
@@ -325,7 +345,7 @@ public class RecordWriterTest
 
     @DisplayName("Write 20 rows, in unbuffered mode with BATCH_SIZE of 2")
     @Test()
-    void writeUnbuffered()
+    void writeUnbuffered() throws InterruptedException
     {
         int numberOfRows = 20;
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(numberOfRows, true);
@@ -334,7 +354,7 @@ public class RecordWriterTest
 
     @DisplayName("Write 20 rows, in buffered mode with SSTABLE_DATA_SIZE_IN_MB of 10")
     @Test()
-    void writeBuffered()
+    void writeBuffered() throws InterruptedException
     {
         int numberOfRows = 20;
         Iterator<Tuple2<DecoratedKey, Object[]>> data = generateData(numberOfRows, true);
@@ -346,7 +366,7 @@ public class RecordWriterTest
 
     private void validateSuccessfulWrite(MockBulkWriterContext writerContext,
                                          Iterator<Tuple2<DecoratedKey, Object[]>> data,
-                                         String[] columnNames)
+                                         String[] columnNames) throws InterruptedException
     {
         validateSuccessfulWrite(writerContext, data, columnNames, UPLOADED_TABLES);
     }
@@ -354,11 +374,14 @@ public class RecordWriterTest
     private void validateSuccessfulWrite(MockBulkWriterContext writerContext,
                                          Iterator<Tuple2<DecoratedKey, Object[]>> data,
                                          String[] columnNames,
-                                         int uploadedTables)
+                                         int uploadedTables) throws InterruptedException
     {
         RecordWriter rw = new RecordWriter(writerContext, columnNames, () -> tc, SSTableWriter::new);
         rw.write(data);
+        // Wait for uploads to finish
+        Thread.sleep(500);
         Map<CassandraInstance, List<UploadRequest>> uploads = writerContext.getUploads();
+        System.out.println("Uploads in test: " + uploads.values().stream().mapToInt(List::size).sum());
         assertThat(uploads.keySet().size(), is(REPLICA_COUNT));  // Should upload to 3 replicas
         assertThat(uploads.values().stream().mapToInt(List::size).sum(), is(REPLICA_COUNT * FILES_PER_SSTABLE * uploadedTables));
         List<UploadRequest> requests = uploads.values().stream().flatMap(List::stream).collect(Collectors.toList());

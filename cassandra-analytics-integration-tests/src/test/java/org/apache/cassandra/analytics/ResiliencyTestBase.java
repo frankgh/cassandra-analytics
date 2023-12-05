@@ -36,18 +36,14 @@ import java.util.stream.IntStream;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Range;
 
-import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.ConsistencyLevel;
-import com.datastax.driver.core.PreparedStatement;
-import com.datastax.driver.core.ResultSet;
-import com.datastax.driver.core.Row;
-import com.datastax.driver.core.Session;
 import o.a.c.analytics.sidecar.shaded.testing.adapters.base.StorageJmxOperations;
 import o.a.c.analytics.sidecar.shaded.testing.common.JmxClient;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.IInstanceConfig;
 import org.apache.cassandra.distributed.api.IUpgradeableInstance;
+import org.apache.cassandra.distributed.api.Row;
 import org.apache.cassandra.distributed.api.SimpleQueryResult;
 import org.apache.cassandra.distributed.api.TokenSupplier;
 import org.apache.cassandra.sidecar.testing.IntegrationTestBase;
@@ -230,32 +226,44 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
         return sql.createDataFrame(rows, schema);
     }
 
-    public void validateData(Session session, String tableName, ConsistencyLevel cl)
+    public void validateData(String tableName, ConsistencyLevel cl)
     {
-        PreparedStatement preparedStatement = session.prepare(String.format(retrieveRows, tableName));
-        preparedStatement.setConsistencyLevel(cl);
-        BoundStatement boundStatement = preparedStatement.bind();
-        ResultSet resultSet = session.execute(boundStatement);
-        Set<String> rows = new HashSet<>();
-        for (Row row : resultSet.all())
+        String query = String.format(retrieveRows, tableName);
+        try
         {
-            if (row.isNull("id") || row.isNull("course") || row.isNull("marks"))
+            SimpleQueryResult resultSet = sidecarTestContext.cluster().get(1).coordinator()
+                                                            .executeWithResult(query, mapConsistencyLevel(cl));
+            Set<String> rows = new HashSet<>();
+            for (SimpleQueryResult it = resultSet; it.hasNext();)
             {
-                throw new RuntimeException("Unrecognized row in table");
+                Row row = it.next();
+                if (row.get("id") == null || row.get("course") == null || row.get("marks") == null)
+                {
+                    throw new RuntimeException("Unrecognized row in table");
+                }
+
+                int id = row.getInteger("id");
+                String course = row.getString("course");
+                int marks = row.getInteger("marks");
+                rows.add(id + ":" + course + ":" + marks);
             }
-
-            int id = row.getInt("id");
-            String course = row.getString("course");
-            int marks = row.getInt("marks");
-            rows.add(id + ":" + course + ":" + marks);
+            for (int i = 0; i < rowCount; i++)
+            {
+                String expectedRow = i + ":course" + i + ":" + i;
+                rows.remove(expectedRow);
+            }
+            assertTrue(rows.isEmpty());
         }
-
-        for (int i = 0; i < rowCount; i++)
+        catch (Exception ex)
         {
-            String expectedRow = i + ":course" + i + ":" + i;
-            rows.remove(expectedRow);
+            logger.error("Validation Query failed", ex);
+            throw ex;
         }
-        assertTrue(rows.isEmpty());
+    }
+
+    private org.apache.cassandra.distributed.api.ConsistencyLevel mapConsistencyLevel(ConsistencyLevel cl)
+    {
+        return org.apache.cassandra.distributed.api.ConsistencyLevel.valueOf(cl.name());
     }
 
     public void validateNodeSpecificData(QualifiedTableName table,

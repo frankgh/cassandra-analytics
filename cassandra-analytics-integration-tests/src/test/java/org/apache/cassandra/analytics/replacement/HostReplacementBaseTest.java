@@ -22,27 +22,32 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
-import com.datastax.driver.core.Session;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.analytics.TestTokenSupplier;
 import org.apache.cassandra.config.CassandraRelevantProperties;
 import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.Feature;
+import org.apache.cassandra.distributed.api.IInstance;
 import org.apache.cassandra.distributed.api.IInstanceConfig;
 import org.apache.cassandra.distributed.api.IUpgradeableInstance;
 import org.apache.cassandra.distributed.api.TokenSupplier;
+import org.apache.cassandra.distributed.impl.AbstractCluster;
+import org.apache.cassandra.distributed.impl.InstanceConfig;
 import org.apache.cassandra.distributed.shared.ClusterUtils;
+import org.apache.cassandra.distributed.shared.NetworkTopology;
 import org.apache.cassandra.testing.CassandraIntegrationTest;
 import org.apache.cassandra.testing.ConfigurableCassandraTestContext;
 
@@ -94,6 +99,7 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
         UpgradeableCluster cluster = cassandraTestContext.configureAndStartCluster(builder -> {
             builder.withInstanceInitializer(instanceInitializer);
             builder.withTokenSupplier(tokenSupplier);
+            builder.withDynamicPortAllocation(false);
         });
 
         assertThat(additionalNodesToStop).isLessThan(cluster.size() - 1);
@@ -201,8 +207,22 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
             }
         }
 
-        Session session = maybeGetSession();
-        validateData(session, schema.tableName(), readCL);
+        validateData(schema.tableName(), readCL);
+    }
+
+    public static <I extends IInstance> I addInstanceLocal(AbstractCluster<I> cluster,
+                                                           String dc,
+                                                           String rack,
+                                                           Consumer<IInstanceConfig> fn,
+                                                           int remPort)
+    {
+        Objects.requireNonNull(dc, "dc");
+        Objects.requireNonNull(rack, "rack");
+        InstanceConfig config = cluster.newInstanceConfig();
+        config.set("storage_port", remPort);
+        config.networkTopology().put(config.broadcastAddress(), NetworkTopology.dcAndRack(dc, rack));
+        fn.accept(config);
+        return cluster.bootstrap(config);
     }
 
     private List<IUpgradeableInstance> startReplacementNodes(CountDownLatch nodeStart,
@@ -218,7 +238,7 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
             String remAddress = removedConfig.broadcastAddress().getAddress().getHostAddress();
             int remPort = removedConfig.getInt("storage_port");
             IUpgradeableInstance replacement =
-            ClusterUtils.addInstance(cluster, removedConfig,
+            addInstanceLocal(cluster, removedConfig.localDatacenter(), removedConfig.localRack(),
                                      c -> {
                                          c.set("auto_bootstrap", true);
                                          // explicitly DOES NOT set instances that failed startup as "shutdown"
@@ -227,7 +247,8 @@ public class HostReplacementBaseTest extends ResiliencyTestBase
                                          c.with(Feature.GOSSIP,
                                                 Feature.JMX,
                                                 Feature.NATIVE_PROTOCOL);
-                                     });
+                                     },
+                             remPort);
 
             new Thread(() -> ClusterUtils.start(replacement, (properties) -> {
                 properties.set(CassandraRelevantProperties.BOOTSTRAP_SKIP_SCHEMA_CHECK, true);

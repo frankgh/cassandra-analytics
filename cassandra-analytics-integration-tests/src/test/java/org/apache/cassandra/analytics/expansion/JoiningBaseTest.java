@@ -30,7 +30,6 @@ import java.util.function.BiConsumer;
 import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
-import com.datastax.driver.core.Session;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.analytics.TestTokenSupplier;
@@ -80,8 +79,7 @@ public class JoiningBaseTest extends ResiliencyTestBase
 
         assertNotNull(table);
 
-        Session session = maybeGetSession();
-        validateData(session, table.tableName(), readCL);
+        validateData(table.tableName(), readCL);
         validateNodeSpecificData(table, expectedInstanceData);
 
         // For tests that involve JOIN failures, we make a best-effort attempt to check if the node join has failed

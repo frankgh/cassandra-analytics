@@ -28,7 +28,6 @@ import java.util.stream.Collectors;
 import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
-import com.datastax.driver.core.Session;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.distributed.UpgradeableCluster;
@@ -75,9 +74,8 @@ class LeavingBaseTest extends ResiliencyTestBase
             }
         }
 
-        Session session = maybeGetSession();
         assertNotNull(table);
-        validateData(session, table.tableName(), readCL);
+        validateData(table.tableName(), readCL);
         validateNodeSpecificData(table, expectedInstanceData, false);
 
         // For tests that involve LEAVE failures, we validate that the leaving nodes are part of the cluster

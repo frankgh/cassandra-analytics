@@ -29,13 +29,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -68,7 +69,6 @@ public class RecordWriter implements Serializable
 
     private final BulkWriteValidator writeValidator;
     private final ReplicaAwareFailureHandler<RingInstance> failureHandler;
-    private final Set<StreamSession> sessions = new HashSet<>();
     private int batchNumber = 0;
     private int batchSize = 0;
 
@@ -110,6 +110,7 @@ public class RecordWriter implements Serializable
         TokenRangeMapping<RingInstance> initialTokenRangeMapping = writerContext.cluster().getTokenRangeMapping(false);
         Map<Range<BigInteger>, List<RingInstance>> initialTokenRangeInstances =
         taskTokenRangeMapping(initialTokenRangeMapping, taskTokenRange);
+        List<StreamResult> results = new ArrayList<>();
 
         writeValidator.setPhase("Environment Validation");
         writeValidator.validateClOrFail(initialTokenRangeMapping);
@@ -121,7 +122,7 @@ public class RecordWriter implements Serializable
         LOGGER.info("[{}]: Processing bulk writer partition", taskContext.partitionId());
         scala.collection.Iterator<scala.Tuple2<DecoratedKey, Object[]>> dataIterator =
         new InterruptibleIterator<>(taskContext, asScalaIterator(sourceIterator));
-        StreamSession streamSession = createStreamSession(taskContext);
+        StreamSession streamSession = null;
         int partitionId = taskContext.partitionId();
         JobInfo job = writerContext.job();
         Path baseDir = Paths.get(System.getProperty("java.io.tmpdir"),
@@ -132,36 +133,31 @@ public class RecordWriter implements Serializable
         Map<String, Object> valueMap = new HashMap<>();
         try
         {
-            List<RingInstance> exclusions = failureHandler.getFailedInstances();
             Set<Range<BigInteger>> newRanges = initialTokenRangeMapping.getRangeMap().asMapOfRanges().entrySet()
                                                                        .stream()
-                                                                       .filter(e -> !exclusions.contains(e.getValue()))
                                                                        .map(Map.Entry::getKey)
                                                                        .collect(Collectors.toSet());
+            Range<BigInteger> tokenRange = getTokenRange(taskContext);
+            Set<Range<BigInteger>> subRanges = newRanges.contains(tokenRange) ?
+                                               Collections.singleton(tokenRange) :
+                                               getIntersectingSubRanges(newRanges, tokenRange);
 
             while (dataIterator.hasNext())
             {
                 Tuple2<DecoratedKey, Object[]> rowData = dataIterator.next();
-                streamSession = maybeCreateStreamSession(taskContext, streamSession, rowData, newRanges, failureHandler);
-
-                sessions.add(streamSession);
+                streamSession = maybeCreateStreamSession(taskContext, streamSession, rowData, subRanges, failureHandler, results);
                 maybeCreateTableWriter(partitionId, baseDir);
                 writeRow(rowData, valueMap, partitionId, streamSession.getTokenRange());
                 checkBatchSize(streamSession, partitionId, job);
             }
 
-            // Finalize SSTable for the last StreamSession
-            if (sstableWriter != null || (streamSession != null && batchSize != 0))
+            // Cleanup SSTable writer and schedule the last stream
+            if (sstableWriter != null)
             {
                 finalizeSSTable(streamSession, partitionId, sstableWriter, batchNumber, batchSize);
+                results.add(streamSession.close());
             }
             LOGGER.info("[{}] Done with all writers and waiting for stream to complete", partitionId);
-
-            final List<StreamResult> results = new ArrayList<>();
-            for (StreamSession session : sessions)
-            {
-                results.add(session.close());
-            }
 
             // When instances for the partition's token range have changed within the scope of the task execution,
             // we fail the task for it to be retried
@@ -207,8 +203,10 @@ public class RecordWriter implements Serializable
     private StreamSession maybeCreateStreamSession(TaskContext taskContext,
                                                    StreamSession streamSession,
                                                    Tuple2<DecoratedKey, Object[]> rowData,
-                                                   Set<Range<BigInteger>> newRanges,
-                                                   ReplicaAwareFailureHandler<RingInstance> failureHandler) throws IOException
+                                                   Set<Range<BigInteger>> subRanges,
+                                                   ReplicaAwareFailureHandler<RingInstance> failureHandler,
+                                                   List<StreamResult> results)
+    throws IOException, ExecutionException, InterruptedException
     {
         BigInteger token = rowData._1().getToken();
         Range<BigInteger> tokenRange = getTokenRange(taskContext);
@@ -216,37 +214,51 @@ public class RecordWriter implements Serializable
         Preconditions.checkState(tokenRange.contains(token),
                                  String.format("Received Token %s outside of expected range %s", token, tokenRange));
 
-        // token range for this partition is not among the write-replica-set ranges
-        if (!newRanges.contains(tokenRange))
+        // We have split ranges likely resulting from pending nodes
+        // Evaluate creating a new session if the token from current row is part of a sub-range
+        if (subRanges.size() > 1)
         {
-            Set<Range<BigInteger>> subRanges = getIntersectingSubRanges(newRanges, tokenRange);
-            // We have split ranges - likely resulting from pending nodes
-            if (subRanges.size() > 1)
-            {
-                // Create session using sub-range that contains the token from current row
-                Range<BigInteger> matchingRange = subRanges.stream().filter(r -> r.contains(token)).findFirst().get();
-                Preconditions.checkState(matchingRange != null,
-                                         String.format("Received Token %s outside of expected range %s", token, matchingRange));
-
-                if (streamSession != null && streamSession.getTokenRange() == matchingRange)
-                {
-                    return streamSession;
-                }
-                else
-                {
-                    LOGGER.debug(String.format("[{}] Creating stream session for range: %s", matchingRange), taskContext.partitionId());
-                    if (streamSession != null && batchSize != 0)
-                    {
-                        finalizeSSTable(streamSession, taskContext.partitionId(), sstableWriter, batchNumber, batchSize);
-                        sstableWriter = null;
-                        batchSize = 0;
-                    }
-                    return new StreamSession(writerContext, getStreamId(taskContext), matchingRange, failureHandler);
-                }
-            }
+            // Create session using sub-range that contains the token from current row
+            Range<BigInteger> matchingSubRange = subRanges.stream().filter(r -> r.contains(token)).findFirst().get();
+            Preconditions.checkState(matchingSubRange != null,
+                                     String.format("Received Token %s outside of expected range %s", token, matchingSubRange));
+            streamSession = maybeCreateSubRangeSession(taskContext, streamSession, failureHandler, results, matchingSubRange);
         }
 
-        return (streamSession != null) ? streamSession : createStreamSession(taskContext);
+        // If we do not have any stream session at this point, we create a session using the partition's token range
+        return (streamSession == null) ? createStreamSession(taskContext) : streamSession;
+    }
+
+    /**
+     * Given that the token belongs to a sub-range, creates a new stream session if either
+     * 1) we do not have an existing stream session, or 2) the existing stream session corresponds to a range that
+     * does NOT match the sub-range the token belongs to.
+     */
+    private StreamSession maybeCreateSubRangeSession(TaskContext taskContext,
+                                                     StreamSession streamSession,
+                                                     ReplicaAwareFailureHandler<RingInstance> failureHandler,
+                                                     List<StreamResult> results,
+                                                     Range<BigInteger> matchingSubRange)
+    throws IOException, ExecutionException, InterruptedException
+    {
+        if (streamSession == null || streamSession.getTokenRange() != matchingSubRange)
+        {
+            LOGGER.debug("[{}] Creating stream session for range: {}", taskContext.partitionId(), matchingSubRange);
+            // Schedule data to be sent if we are processing a batch that has not been scheduled yet.
+            if (streamSession != null)
+            {
+                // Complete existing batched writes (if any) before the existing stream session is closed
+                if (batchSize != 0)
+                {
+                    finalizeSSTable(streamSession, taskContext.partitionId(), sstableWriter, batchNumber, batchSize);
+                    sstableWriter = null;
+                    batchSize = 0;
+                }
+                results.add(streamSession.close());
+            }
+            streamSession = new StreamSession(writerContext, getStreamId(taskContext), matchingSubRange, failureHandler);
+        }
+        return streamSession;
     }
 
     /**
@@ -267,6 +279,7 @@ public class RecordWriter implements Serializable
         Map<Range<BigInteger>, List<RingInstance>> startMapping = taskTokenRangeMapping(startTaskMapping, taskTokenRange);
         Map<Range<BigInteger>, List<RingInstance>> endMapping = taskTokenRangeMapping(endTaskMapping, taskTokenRange);
 
+        // Token ranges are identical and overall instance list is same
         return !(startMapping.keySet().equals(endMapping.keySet()) &&
                instancesFromMapping(startMapping).equals(instancesFromMapping(endMapping)));
     }
@@ -322,7 +335,6 @@ public class RecordWriter implements Serializable
             if (batchSize >= job.getSstableBatchSize())
             {
                 finalizeSSTable(streamSession, partitionId, sstableWriter, batchNumber, batchSize);
-
                 sstableWriter = null;
                 batchSize = 0;
             }

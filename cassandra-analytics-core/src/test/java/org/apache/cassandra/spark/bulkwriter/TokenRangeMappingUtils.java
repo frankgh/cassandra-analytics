@@ -37,6 +37,7 @@ import org.apache.cassandra.sidecar.common.data.RingEntry;
 import org.apache.cassandra.sidecar.common.data.TokenRangeReplicasResponse.ReplicaMetadata;
 import org.apache.cassandra.spark.bulkwriter.token.RangeUtils;
 import org.apache.cassandra.spark.bulkwriter.token.TokenRangeMapping;
+import org.apache.cassandra.spark.common.client.InstanceStatus;
 import org.apache.cassandra.spark.data.ReplicationFactor;
 import org.apache.cassandra.spark.data.partitioner.Partitioner;
 
@@ -50,13 +51,36 @@ public final class TokenRangeMappingUtils
 
     public static TokenRangeMapping<RingInstance> buildTokenRangeMapping(final int initialToken, final ImmutableMap<String, Integer> rfByDC, int instancesPerDC)
     {
+        return buildTokenRangeMapping(initialToken, rfByDC, instancesPerDC, false, -1);
+    }
 
+    public static TokenRangeMapping<RingInstance> buildTokenRangeMappingWithFailures(int initialToken,
+                                                                                     ImmutableMap<String, Integer> rfByDC,
+                                                                                     int instancesPerDC)
+    {
         final List<RingInstance> instances = getInstances(initialToken, rfByDC, instancesPerDC);
+        RingInstance instance = instances.remove(0);
+        RingEntry entry = instance.getRingInstance();
+        RingEntry newEntry = new RingEntry.Builder()
+                             .datacenter(entry.datacenter())
+                             .port(entry.port())
+                             .address(entry.address())
+                             .status(InstanceStatus.DOWN.name())
+                             .state(entry.state())
+                             .token(entry.token())
+                             .fqdn(entry.fqdn())
+                             .rack(entry.rack())
+                             .owns(entry.owns())
+                             .load(entry.load())
+                             .hostId(entry.hostId())
+                             .build();
+        RingInstance newInstance = new RingInstance(newEntry);
+        instances.add(0, newInstance);
         ReplicationFactor replicationFactor = getReplicationFactor(rfByDC);
         Map<String, Set<String>> writeReplicas =
-        instances.stream()
-                 .collect(Collectors.groupingBy(RingInstance::getDataCenter,
-                                                Collectors.mapping(RingInstance::getNodeName, Collectors.toSet())));
+        instances.stream().collect(Collectors.groupingBy(RingInstance::getDataCenter,
+                                                         Collectors.mapping(RingInstance::getNodeName,
+                                                                            Collectors.toSet())));
         writeReplicas.replaceAll((key, value) -> {
             value.removeIf(e -> value.size() > 3);
             return value;
@@ -81,6 +105,7 @@ public final class TokenRangeMappingUtils
                                        Collections.emptySet(),
                                        Collections.emptySet());
     }
+
 
     public static TokenRangeMapping<RingInstance> buildTokenRangeMapping(int initialToken,
                                                                          ImmutableMap<String, Integer> rfByDC,

@@ -29,7 +29,6 @@ import java.util.function.BiConsumer;
 import com.google.common.util.concurrent.Uninterruptibles;
 
 import com.datastax.driver.core.ConsistencyLevel;
-import com.datastax.driver.core.Session;
 import o.a.c.analytics.sidecar.shaded.testing.common.data.QualifiedTableName;
 import org.apache.cassandra.analytics.ResiliencyTestBase;
 import org.apache.cassandra.analytics.TestTokenSupplier;
@@ -107,8 +106,7 @@ public class NodeMovementBaseTest extends ResiliencyTestBase
         {
             ClusterUtils.awaitRingState(cluster.get(1), movingNode, "Normal");
         }
-        Session session = maybeGetSession();
-        validateData(session, schema.tableName(), readCL);
+        validateData(schema.tableName(), readCL);
         validateNodeSpecificData(schema, expectedInstanceData, false);
 
         // For tests that involve MOVE failures, we make a best-effort attempt by checking if the node is either

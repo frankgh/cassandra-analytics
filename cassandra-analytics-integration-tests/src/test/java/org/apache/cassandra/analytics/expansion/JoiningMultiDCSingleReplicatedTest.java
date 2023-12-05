@@ -24,7 +24,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import com.google.common.util.concurrent.Uninterruptibles;
-
 import org.junit.jupiter.api.TestInfo;
 
 import com.datastax.driver.core.ConsistencyLevel;
@@ -47,7 +46,7 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
 public class JoiningMultiDCSingleReplicatedTest extends JoiningTestBase
 {
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1,  useCrossDcKeyspace = false, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1,  useCrossDcKeyspace = false, numDcs = 2, network = true, buildCluster = false)
     void allReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultiDC.reset();
@@ -62,7 +61,7 @@ public class JoiningMultiDCSingleReplicatedTest extends JoiningTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, useCrossDcKeyspace = false, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, useCrossDcKeyspace = false, network = true, buildCluster = false)
     void allReadOneWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultiDCFailure.reset();
@@ -77,11 +76,11 @@ public class JoiningMultiDCSingleReplicatedTest extends JoiningTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, useCrossDcKeyspace = false, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, useCrossDcKeyspace = false, network = true, buildCluster = false)
     void localQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultiDC.reset();
-        UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext, config -> config.withDynamicPortAllocation(false));
+        UpgradeableCluster cluster = getMultiDCCluster(BBHelperMultiDC::install, cassandraTestContext);
 
         runJoiningTestScenario(BBHelperMultiDC.transitioningStateStart,
                                BBHelperMultiDC.transitioningStateEnd,
@@ -92,7 +91,7 @@ public class JoiningMultiDCSingleReplicatedTest extends JoiningTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, useCrossDcKeyspace = false, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, useCrossDcKeyspace = false, network = true, buildCluster = false)
     void localQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultiDCFailure.reset();
@@ -107,7 +106,7 @@ public class JoiningMultiDCSingleReplicatedTest extends JoiningTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, useCrossDcKeyspace = false, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, useCrossDcKeyspace = false, network = true, buildCluster = false)
     void eachQuorumReadLocalQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultiDC.reset();
@@ -122,7 +121,7 @@ public class JoiningMultiDCSingleReplicatedTest extends JoiningTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, useCrossDcKeyspace = false, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, useCrossDcKeyspace = false, network = true, buildCluster = false)
     void eachQuorumReadLocalQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultiDCFailure.reset();
@@ -137,7 +136,7 @@ public class JoiningMultiDCSingleReplicatedTest extends JoiningTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, useCrossDcKeyspace = false, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, useCrossDcKeyspace = false, network = true, buildCluster = false)
     void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultiDC.reset();
@@ -152,7 +151,7 @@ public class JoiningMultiDCSingleReplicatedTest extends JoiningTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, useCrossDcKeyspace = false, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, numDcs = 2, useCrossDcKeyspace = false, network = true, buildCluster = false)
     void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultiDCFailure.reset();

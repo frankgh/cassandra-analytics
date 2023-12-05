@@ -105,7 +105,6 @@ public class HostReplacementTestBase extends ResiliencyTestBase
         UpgradeableCluster cluster = cassandraTestContext.configureAndStartCluster(builder -> {
             builder.withInstanceInitializer(instanceInitializer);
             builder.withTokenSupplier(tokenSupplier);
-            builder.withDynamicPortAllocation(false);
         });
 
         waitForHealthyRing(cluster);

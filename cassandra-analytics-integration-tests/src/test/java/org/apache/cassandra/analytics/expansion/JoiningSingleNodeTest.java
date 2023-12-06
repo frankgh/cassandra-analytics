@@ -46,7 +46,7 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
 public class JoiningSingleNodeTest extends JoiningTestBase
 {
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, buildCluster = false)
     void oneReadALLWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperSingleJoiningNode.reset();
@@ -59,7 +59,7 @@ public class JoiningSingleNodeTest extends JoiningTestBase
                                false, testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, buildCluster = false)
     void oneReadALLWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperSingleJoiningNodeFailure.reset();
@@ -72,7 +72,7 @@ public class JoiningSingleNodeTest extends JoiningTestBase
                                true, testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, buildCluster = false)
     void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperSingleJoiningNode.reset();
@@ -85,7 +85,7 @@ public class JoiningSingleNodeTest extends JoiningTestBase
                                false, testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 1, network = true, buildCluster = false)
     void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperSingleJoiningNodeFailure.reset();

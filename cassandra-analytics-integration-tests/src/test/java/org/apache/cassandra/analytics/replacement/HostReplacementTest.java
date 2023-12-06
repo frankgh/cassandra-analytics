@@ -46,7 +46,7 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
 public class HostReplacementTest extends HostReplacementTestBase
 {
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, buildCluster = false)
     void hostReplacementQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperReplacementsNode.reset();
@@ -61,7 +61,7 @@ public class HostReplacementTest extends HostReplacementTestBase
     }
 
     // Note: The following test depends on sidecar fix: https://issues.apache.org/jira/browse/CASSANDRASC-78
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, buildCluster = false)
     void hostReplacementOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperReplacementsNode.reset();
@@ -75,7 +75,7 @@ public class HostReplacementTest extends HostReplacementTestBase
                            ConsistencyLevel.ALL, testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, buildCluster = false)
     void hostReplacementFailureQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperReplacementsNodeFailure.reset();
@@ -90,7 +90,7 @@ public class HostReplacementTest extends HostReplacementTestBase
 
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 1, network = true, buildCluster = false)
     void hostReplacementFailureOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperReplacementsNodeFailure.reset();

@@ -46,7 +46,7 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 
 public class NodeMovementTest extends NodeMovementTestBase
 {
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, buildCluster = false)
     void moveNodeQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMovingNode.reset();
@@ -59,7 +59,7 @@ public class NodeMovementTest extends NodeMovementTestBase
                           ConsistencyLevel.QUORUM, testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, buildCluster = false)
     void moveNodeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMovingNode.reset();
@@ -72,7 +72,7 @@ public class NodeMovementTest extends NodeMovementTestBase
                           ConsistencyLevel.ALL, testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, buildCluster = false)
     void moveNodeAllReadOneWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMovingNode.reset();
@@ -85,7 +85,7 @@ public class NodeMovementTest extends NodeMovementTestBase
                           ConsistencyLevel.ONE, testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, buildCluster = false)
     void moveNodeFailureQuorumReadAndWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMovingNodeFailure.reset();
@@ -98,7 +98,7 @@ public class NodeMovementTest extends NodeMovementTestBase
                           ConsistencyLevel.QUORUM, testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, buildCluster = false)
     void moveNodeFailureOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMovingNodeFailure.reset();

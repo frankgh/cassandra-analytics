@@ -46,7 +46,7 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
 public class JoiningDoubleClusterTest extends JoiningTestBase
 {
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, buildCluster = false)
     void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperDoubleClusterSize.reset();
@@ -60,7 +60,7 @@ public class JoiningDoubleClusterTest extends JoiningTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, buildCluster = false)
     void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperDoubleClusterSizeFailure.reset();
@@ -74,7 +74,7 @@ public class JoiningDoubleClusterTest extends JoiningTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, buildCluster = false)
     void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperDoubleClusterSize.reset();
@@ -88,7 +88,7 @@ public class JoiningDoubleClusterTest extends JoiningTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, newNodesPerDc = 5, network = true, buildCluster = false)
     void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperDoubleClusterSizeFailure.reset();

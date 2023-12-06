@@ -175,8 +175,8 @@ public class HostReplacementMultiDCTest extends HostReplacementTestBase
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
-            // Test case involves 10 node cluster (5 per DC) with a replacement node
-            // We intercept the bootstrap of the replacement (11th) node to validate token ranges
+            // Test case involves 6 node cluster (3 per DC) with a replacement node
+            // We intercept the bootstrap of the replacement (7th) node to validate token ranges
             if (nodeNumber == 7)
             {
                 TypePool typePool = TypePool.Default.of(cl);
@@ -277,8 +277,8 @@ public class HostReplacementMultiDCTest extends HostReplacementTestBase
 
         public static void install(ClassLoader cl, Integer nodeNumber)
         {
-            // Test case involves 5 node cluster with a replacement node
-            // We intercept the bootstrap of the replacement (6th) node to validate token ranges
+            // Test case involves 10 node cluster (5 per DC) with a replacement node
+            // We intercept the bootstrap of the replacement (11th) node to validate token ranges
             if (nodeNumber == 11)
             {
                 TypePool typePool = TypePool.Default.of(cl);

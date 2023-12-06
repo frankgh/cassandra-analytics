@@ -48,7 +48,7 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 
 class LeavingTest extends LeavingTestBase
 {
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, buildCluster = false)
     void singleLeavingNodeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperSingleLeavingNode.reset();
@@ -63,7 +63,7 @@ class LeavingTest extends LeavingTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, buildCluster = false)
     void singleLeavingNodeOneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperSingleLeavingNodeFailure.reset();
@@ -78,7 +78,7 @@ class LeavingTest extends LeavingTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, buildCluster = false)
     void singleLeavingNodeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperSingleLeavingNode.reset();
@@ -93,7 +93,7 @@ class LeavingTest extends LeavingTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, buildCluster = false)
     void singleLeavingNodeQuorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperSingleLeavingNodeFailure.reset();
@@ -108,7 +108,7 @@ class LeavingTest extends LeavingTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, buildCluster = false)
     void multipleLeavingNodesOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultipleLeavingNodes.reset();
@@ -123,7 +123,7 @@ class LeavingTest extends LeavingTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, buildCluster = false)
     void multipleLeavingNodesOneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultipleLeavingNodesFailure.reset();
@@ -138,7 +138,7 @@ class LeavingTest extends LeavingTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, buildCluster = false)
     void multipleLeavingNodesQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultipleLeavingNodes.reset();
@@ -153,7 +153,7 @@ class LeavingTest extends LeavingTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 5, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 5, network = true, buildCluster = false)
     void multipleLeavingNodesQuorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultipleLeavingNodesFailure.reset();
@@ -168,7 +168,7 @@ class LeavingTest extends LeavingTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 6, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 6, network = true, buildCluster = false)
     void halveClusterSizeOneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperHalveClusterSize.reset();
@@ -183,7 +183,7 @@ class LeavingTest extends LeavingTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 6, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 6, network = true, buildCluster = false)
     void halveClusterSizeQuorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperHalveClusterSize.reset();

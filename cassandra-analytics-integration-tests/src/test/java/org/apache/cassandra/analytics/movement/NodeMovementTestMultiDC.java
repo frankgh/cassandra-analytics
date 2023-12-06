@@ -50,7 +50,7 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
 public class NodeMovementTestMultiDC extends NodeMovementTestBase
 {
 
-    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, buildCluster = false)
     void moveNodeMultiDCTest(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMovingNodeMultiDC.reset();
@@ -64,7 +64,7 @@ public class NodeMovementTestMultiDC extends NodeMovementTestBase
 
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, buildCluster = false)
     void moveNodeMultiDCQuorumReadWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMovingNodeMultiDC.reset();
@@ -78,7 +78,7 @@ public class NodeMovementTestMultiDC extends NodeMovementTestBase
 
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, buildCluster = false)
     void moveNodeMultiDCEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMovingNodeMultiDC.reset();
@@ -92,7 +92,7 @@ public class NodeMovementTestMultiDC extends NodeMovementTestBase
 
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, buildCluster = false)
     void moveNodeMultiDCAllWriteOneRead(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMovingNodeMultiDC.reset();
@@ -106,7 +106,7 @@ public class NodeMovementTestMultiDC extends NodeMovementTestBase
 
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, buildCluster = false)
     void moveNodeMultiDCOneWriteAllRead(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMovingNodeMultiDC.reset();
@@ -120,7 +120,7 @@ public class NodeMovementTestMultiDC extends NodeMovementTestBase
 
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, buildCluster = false)
     void moveNodeFailureMultiDCTest(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultiDCMovingNodeFailure.reset();
@@ -134,7 +134,7 @@ public class NodeMovementTestMultiDC extends NodeMovementTestBase
 
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, buildCluster = false)
     void moveNodeFailureMultiDCEachQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultiDCMovingNodeFailure.reset();
@@ -148,7 +148,7 @@ public class NodeMovementTestMultiDC extends NodeMovementTestBase
 
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, numDcs = 2, network = true, buildCluster = false)
     void moveNodeFailureMultiDCAllWriteOneRead(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo) throws Exception
     {
         BBHelperMultiDCMovingNodeFailure.reset();

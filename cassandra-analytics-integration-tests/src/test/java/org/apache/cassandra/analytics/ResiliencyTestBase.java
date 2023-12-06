@@ -360,19 +360,10 @@ public abstract class ResiliencyTestBase extends IntegrationTestBase
 
         QualifiedTableName schema = initializeSchema(rf);
         Thread.sleep(2000);
-        String logFilePath = Paths.get("../build/test-reports/" + testName).toAbsolutePath().toString();
-//        String logFileName = logFilePath + "-spark.log";
-
         List<String> command = new ArrayList<>();
         command.add(System.getProperty("java.home") + File.separator + "bin" + File.separator + "java");
         // Uncomment the line below to debug on localhost
         // command.add("-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:5151");
-//        // Override any log4j settings
-//        command.add("-Dlog4j.appender.file.type=File");
-//        command.add("-Dlog4j.appender.file.File=\"" + logFileName + "\"");
-//        command.add("-Dlog4j.rootLogger=\"file,File\"");
-//        command.add("-Dlog4j.rootCategory=\"INFO,file\"");
-        // command.add("-Dlogfile.name=\"" + logFileName + "\"");
         command.addAll(ManagementFactory.getRuntimeMXBean().getInputArguments()
                                         .stream()
                                         // Remove any already-existing debugger agents from the arguments

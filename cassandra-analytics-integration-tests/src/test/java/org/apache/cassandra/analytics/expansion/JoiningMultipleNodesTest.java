@@ -46,7 +46,7 @@ import static net.bytebuddy.matcher.ElementMatchers.takesArguments;
 
 public class JoiningMultipleNodesTest extends JoiningTestBase
 {
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, buildCluster = false)
     void oneReadAllWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
@@ -61,7 +61,7 @@ public class JoiningMultipleNodesTest extends JoiningTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, buildCluster = false)
     void oneReadAllWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
@@ -76,7 +76,7 @@ public class JoiningMultipleNodesTest extends JoiningTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, buildCluster = false)
     void quorumReadQuorumWrite(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
@@ -91,7 +91,7 @@ public class JoiningMultipleNodesTest extends JoiningTestBase
                                testInfo.getDisplayName());
     }
 
-    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, gossip = true, buildCluster = false)
+    @CassandraIntegrationTest(nodesPerDc = 3, newNodesPerDc = 2, network = true, buildCluster = false)
     void quorumReadQuorumWriteFailure(ConfigurableCassandraTestContext cassandraTestContext, TestInfo testInfo)
     throws Exception
     {
